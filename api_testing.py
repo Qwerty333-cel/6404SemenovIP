@@ -17,7 +17,7 @@ load_dotenv()  # Загружает переменные из .env файла
 API_KEY = os.getenv("API_KEY")
 BASE_URL = "https://api.thecatapi.com/v1"
 DEFAULT_TIMEOUT = (5, 20)  # (connect, read)
-HEADERS = {"Accept": "application/json", "x-api-key": API_KEY} #означает, что мы готовы и ожидаем получить JSON-ответ от сервера
+HEADERS = {"Accept": "application/json", "x-api-key": API_KEY} # мы готовы и ожидаем получить JSON-ответ от сервера | передаём API ключ
 
 # try:
 #     response = requests.get(
@@ -73,7 +73,7 @@ class CatImage:
 class CatImageProcessor:
     """Класс для работы с API, загрузки, обработки и сохранения изображений кошек"""
 
-    def __init__(self, api_key: Optional[str] = None):
-        self.api_key = api_key or API_KEY
+    def __init__(self, limit: int = 1):
         self.headers = HEADERS
+        self.headers.append(limit=limit if limit >= 1 and limit <= 100 else 1)
     
