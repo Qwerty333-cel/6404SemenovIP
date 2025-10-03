@@ -10,14 +10,16 @@ import json
 from typing import Any, Dict, Optional, Tuple, List
 import numpy as np
 import cv2
-from ImageProcessing.implementation.image_processing import ImageProcessing as img_proc
+from implementation.image_processing import ImageProcessing as img_proc
 from requests.exceptions import HTTPError, Timeout, ConnectionError, RequestException
 from dotenv import load_dotenv
 import pathlib
 from numpy.typing import NDArray
 load_dotenv()  # Загружает переменные из .env файла
 
-DEFAULT_TIMEOUT = os.getenv("DEFAULT_TIMEOUT")
+image_processor_instance = img_proc()
+
+DEFAULT_TIMEOUT = (5, 20)
 HEADERS = {"Accept": "application/json"} # мы готовы и ожидаем получить JSON-ответ от сервера
 
 """
@@ -45,42 +47,42 @@ class CatImage:
     def convolution(self, kernel: np.ndarray) -> np.ndarray:
         """Применяет свёртку с указанным ядром к изображению"""
 
-        return img_proc.convolution(self.image, kernel)
+        return image_processor_instance.convolution(self.image, kernel, variant = "old")
     
 
 
     def to_grayscale(self) -> np.ndarray:
         """Преобразует изображение в градации серого"""
 
-        return img_proc.rgb_to_grayscale(self.image)
+        return image_processor_instance.rgb_to_grayscale(self.image, variant = "old")
     
 
 
     def gamma_correction(self, gamma: float) -> np.ndarray:
         """Применяет гамма коррекцию к изображению"""
 
-        return img_proc.gamma_correction(self.image, gamma)
+        return image_processor_instance.gamma_correction(self.image, gamma, variant = "old")
     
 
 
     def edge_detection(self) -> np.ndarray:
         """Применяет детекцию границ к изображению"""
 
-        return img_proc.edge_detection(self.image)
+        return image_processor_instance.edge_detection(self.image, variant = "old")
     
 
 
     def corner_detection(self) -> np.ndarray:
         """Применяет детекцию углов к изображению"""
 
-        return img_proc.corner_detection(self.image)
+        return image_processor_instance.corner_detection(self.image, variant = "old")
     
 
 
     def circle_detection(self) -> np.ndarray:
         """Применяет детекцию кругов к изображению"""
 
-        return img_proc.circle_detection(self.image)
+        return image_processor_instance.circle_detection(self.image)
     
 
 
@@ -248,12 +250,40 @@ class CatImageProcessor:
 
     def save_image(self, image: np.ndarray, filename: str, path: str = None) -> None:
         """Функция для сохранения изображения на диск"""
+
         if path is None:
             path = pathlib.Path(__file__).resolve().parent.parent / "saved_images"
-        if not os.path.exists():
-            os.makedirs(path)
-        cv2.imwrite(path, image)
-        print(f"Изображение сохранено по пути: {path}")
+        path.mkdir(parents=True, exist_ok=True)
+        cv2.imwrite(str(path/filename), image)
+        print(f"Изображение {filename} сохранено в папку: {path}")
 
     
-    # def process_cat_image(self, cat:)
+    def process_cat_image(self, cats: np.ndarray[CatImage], method: str, path: str = None) -> None:
+        """Обработка изображения кошки и сохранение исходника и результата"""
+        if method == "gray":
+            for cat in cats:
+                self.save_image(cat.image, f"{cat.id}_{cat.breed}_orig.png", path=path)
+                self.save_image(cat.to_grayscale(), f"{cat.id}_{cat.breed}_{method}.png", path=path)
+        elif (method == "conv"):
+            kernel = np.array([[-1, -1, -1], [-1, 9, -1], [-1, -1, -1]]) # Ядро для повышения резкости
+            for cat in cats:
+                self.save_image(cat.image, f"{cat.id}_{cat.breed}_orig.png", path=path)
+                self.save_image(cat.convolution(kernel), f"{cat.id}_{cat.breed}_{method}.png", path=path)
+        elif (method == "gamma"):
+            for cat in cats:
+                self.save_image(cat.image, f"{cat.id}_{cat.breed}_orig.png", path=path)
+                self.save_image(cat.gamma_correction(gamma = 3), f"{cat.id}_{cat.breed}_{method}.png", path=path)
+        elif (method == "edges"):
+            for cat in cats:
+                self.save_image(cat.image, f"{cat.id}_{cat.breed}_orig.png", path=path)
+                self.save_image(cat.edge_detection(), f"{cat.id}_{cat.breed}_{method}.png", path=path)
+        elif (method == "corners"):
+            for cat in cats:
+                self.save_image(cat.image, f"{cat.id}_{cat.breed}_orig.png", path=path)
+                self.save_image(cat.corner_detection(), f"{cat.id}_{cat.breed}_{method}.png", path=path)
+        elif (method == "circles"):
+            for cat in cats:
+                self.save_image(cat.image, f"{cat.id}_{cat.breed}_orig.png", path=path)
+                self.save_image(cat.circle_detection(), f"{cat.id}_{cat.breed}_{method}.png", path=path)
+        
+        
