@@ -87,7 +87,7 @@ class CatImage:
     
 
 
-    def edge_detection(self) -> np.ndarray:
+    def edge_detection(self, variant: str = "new") -> np.ndarray:
         """
         Применяет детекцию границ к изображению
 
@@ -96,7 +96,7 @@ class CatImage:
             np.ndarray: 
         """
 
-        return image_processor_instance.edge_detection(self.image, variant = "old")
+        return image_processor_instance.edge_detection(self.image, variant)
     
 
 
@@ -305,6 +305,7 @@ class CatImageProcessor:
             for cat in cats:
                 self.save_image(cat.image, f"{cat.id}_{cat.breed}_orig.png", path=path)
                 self.save_image(cat.edge_detection(), f"{cat.id}_{cat.breed}_{method}.png", path=path)
+                #self.save_image(cat.edge_detection(variant = "old"), f"{cat.id}_{cat.breed}_{method}_cv2.png", path=path)
         elif (method == "corners"):
             for cat in cats:
                 self.save_image(cat.image, f"{cat.id}_{cat.breed}_orig.png", path=path)
