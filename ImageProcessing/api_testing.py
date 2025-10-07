@@ -45,28 +45,56 @@ class CatImage:
 
 
     def convolution(self, kernel: np.ndarray) -> np.ndarray:
-        """Применяет свёртку с указанным ядром к изображению"""
+        """
+        Применяет свёртку с указанным ядром к изображению
+        
+        Args:
+            kernel (np.ndarray): Матрица-ядро для свёртки 
+        
+        Returns:
+            np.ndarray: Изображение с наложенным фильтром свёртки
+        """
 
         return image_processor_instance.convolution(self.image, kernel, variant = "old")
     
 
 
     def to_grayscale(self) -> np.ndarray:
-        """Преобразует изображение в градации серого"""
+        """
+        Преобразует изображение в градации серого
+        
+        Args:
+        Returns:
+            np.ndarray: Изображение в градациях серого (2D)
+        """
 
         return image_processor_instance.rgb_to_grayscale(self.image, variant = "old")
     
 
 
     def gamma_correction(self, gamma: float) -> np.ndarray:
-        """Применяет гамма коррекцию к изображению"""
+        """
+        Применяет гамма коррекцию к изображению
+
+        Args:
+            gamma (float): Коэффициент гамма-преобразования
+        
+        Returns:
+            np.ndarray: Изображение с наложенным гамма-преобразованем
+        """
 
         return image_processor_instance.gamma_correction(self.image, gamma, variant = "old")
     
 
 
     def edge_detection(self) -> np.ndarray:
-        """Применяет детекцию границ к изображению"""
+        """
+        Применяет детекцию границ к изображению
+
+        Args:
+        Returns:
+            np.ndarray: 
+        """
 
         return image_processor_instance.edge_detection(self.image, variant = "old")
     
@@ -285,5 +313,7 @@ class CatImageProcessor:
             for cat in cats:
                 self.save_image(cat.image, f"{cat.id}_{cat.breed}_orig.png", path=path)
                 self.save_image(cat.circle_detection(), f"{cat.id}_{cat.breed}_{method}.png", path=path)
-        
-        
+        # elif (method == "add"):
+        #     for cat in cats:
+
+    
