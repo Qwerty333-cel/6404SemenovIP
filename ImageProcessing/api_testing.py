@@ -1,9 +1,3 @@
-"""
-TODO:
-(сделано) - Реализовать методы __add__ и __sub__ для класса CatImage
-- Добавить работу с запросами к API
-- Добавить обработку ошибок при запросах
-"""
 import os
 import requests
 import json
@@ -55,7 +49,7 @@ class CatImage:
             np.ndarray: Изображение с наложенным фильтром свёртки
         """
 
-        return image_processor_instance.convolution(self.image, kernel, variant = "old")
+        return image_processor_instance.convolution(self.image.copy(), kernel, variant = "old")
     
 
 
@@ -68,7 +62,7 @@ class CatImage:
             np.ndarray: Изображение в градациях серого (2D)
         """
 
-        return image_processor_instance.rgb_to_grayscale(self.image, variant = "old")
+        return image_processor_instance.rgb_to_grayscale(self.image.copy(), variant = "old")
     
 
 
@@ -83,7 +77,7 @@ class CatImage:
             np.ndarray: Изображение с наложенным гамма-преобразованем
         """
 
-        return image_processor_instance.gamma_correction(self.image, gamma, variant = "old")
+        return image_processor_instance.gamma_correction(self.image.copy(), gamma, variant = "old")
     
 
 
@@ -96,44 +90,111 @@ class CatImage:
             np.ndarray: 
         """
 
-        return image_processor_instance.edge_detection(self.image, variant)
+        return image_processor_instance.edge_detection(self.image.copy(), variant)
     
 
 
     def corner_detection(self) -> np.ndarray:
-        """Применяет детекцию углов к изображению"""
+        """
+        Применяет детекцию углов к изображению
+        
+        Args:
+        Returns:
+            np.ndarray: Изображение с наложенным фильтром поиска углов
+        
+        """
 
-        return image_processor_instance.corner_detection(self.image, variant = "old")
+        return image_processor_instance.corner_detection(self.image.copy(), variant = "old")
     
 
 
     def circle_detection(self) -> np.ndarray:
-        """Применяет детекцию кругов к изображению"""
+        """
+        Применяет поиск кругов к изображению
+        
+        Args:
+        Returns:
+            np.ndarray: Изображение с наложенным фильтром поиска кругов
+        """
 
-        return image_processor_instance.circle_detection(self.image)
+        return image_processor_instance.circle_detection(self.image.copy())
     
 
+    def __add__(self, other: 'CatImage') -> np.ndarray:
+        variant = False
+        """
+        Сложение двух изображений
+        
+        Args:
+            other (CatImage): Второе изображение для сложения
+        Returns:
+            np.ndarray: Результат сложения двух изображений
+        """
 
-    def __add__(self, other: 'CatImage', variant: bool = True) -> np.ndarray:
-        """Сложение двух изображений"""
-
-        if self.image.shape != other.image.shape:
+        if (self.image.shape != other.image.shape):
             raise ValueError("Изображения должны быть одинакового размера для сложения.")
         
         else:
+            copy_self = self.image.copy()
+            copy_other = other.image.copy()
+
+
             if variant:
-                    return cv2.add(self.image, other.image)
+                    return cv2.add(copy_self, copy_other)
             
             else:
                 # Альтернативный вариант сложения через numpy с обрезкой значений
-                added_image = self.image.astype(np.int16) + other.image.astype(np.int16)
+                added_image = copy_self.astype(np.int16) + copy_other.astype(np.int16)
                 np.clip(added_image, 0, 255, out=added_image)
                 return added_image.astype(np.uint8)
-    
+
+    def adding_with_correction(self, other: 'CatImage', variant: bool = True, correction: bool = True) -> np.ndarray:
+        """
+        Сложение двух изображений
+        
+        Args:
+            other (CatImage): Второе изображение для сложения
+            variant (bool): Если True, использовать cv2.add, иначе использовать свою реализацию через numpy
+            correction (bool): При True подгоняет размер второго изобраения под первое при необходимости
+        Returns:
+            np.ndarray: Результат сложения двух изображений
+        """
+
+        if (self.image.shape != other.image.shape) and not correction:
+            raise ValueError("Изображения должны быть одинакового размера для сложения.")
+        
+        else:
+            copy_self = self.image.copy()
+            copy_other = other.image.copy()
+            if correction:
+                if copy_self.shape < copy_other.shape:
+                    copy_other = cv2.resize(copy_other, (copy_self.shape[1], copy_self.shape[0]), cv2.INTER_AREA)
+                elif self.image.shape > other.image.shape:
+                    copy_other = cv2.resize(copy_other, (copy_self.shape[1], copy_self.shape[0]), cv2.INTER_CUBIC)
+                else: pass
+
+            if variant:
+                    return cv2.add(copy_self, copy_other)
+            
+            else:
+                # Альтернативный вариант сложения через numpy с обрезкой значений
+                added_image = copy_self.astype(np.int16) + copy_other.astype(np.int16)
+                np.clip(added_image, 0, 255, out=added_image)
+                return added_image.astype(np.uint8)
+
 
 
     def __sub__(self, other: 'CatImage', variant: bool = True) -> np.ndarray:
-        """Вычитание двух изображений"""
+        """
+        Вычитание одного изображения из другого
+        
+        Args:
+            other (CatImage): Вычитаемое изображение
+            variant (bool): Если True, использовать cv2.subtract, иначе использовать свою реализацию через numpy
+            
+        Returns:
+            np.ndarray: Результат вычитания одного изображения из другого
+        """
 
         if self.image.shape != other.image.shape:
             raise ValueError("Изображения должны быть одинакового размера для вычитания.")
@@ -314,7 +375,21 @@ class CatImageProcessor:
             for cat in cats:
                 self.save_image(cat.image, f"{cat.id}_{cat.breed}_orig.png", path=path)
                 self.save_image(cat.circle_detection(), f"{cat.id}_{cat.breed}_{method}.png", path=path)
-        # elif (method == "add"):
-        #     for cat in cats:
+        elif (method == "add"):
+            for cat in cats:
+                self.save_image(cat.image, f"{cat.id}_{cat.breed}_orig.png", path=path)
+                try:
+                    added_image = cat + cats[(cats != cat)][0]  # Складываем с первым другим изображением
+                    self.save_image(added_image, f"{cat.id}_{cat.breed}_{method}.png", path=path)
+                except ValueError as ve:
+                    print(f"Ошибка при сложении изображений: {ve}")
+        elif (method == "sub"):
+            for cat in cats:
+                self.save_image(cat.image, f"{cat.id}_{cat.breed}_orig.png", path=path)
+                try:
+                    subtracted_image = cat - cats[(cats != cat)][0]  # Вычитаем первое другое изображение
+                    self.save_image(subtracted_image, f"{cat.id}_{cat.breed}_{method}_{len(cats)- (len(cats) - 1)}.png", path=path)
+                except ValueError as ve:
+                    print(f"Ошибка при вычитании изображений: {ve}")
 
     
