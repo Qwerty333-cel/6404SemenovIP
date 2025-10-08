@@ -15,11 +15,29 @@
 """
 
 import cv2
-import time as t
+import time
+import functools
 
 import interfaces
 
 import numpy as np
+
+
+def log_execution_time(func):
+    """Декоратор для измерения времени выполнения и логирования."""
+    @functools.wraps(func)
+    def wrapper(self, *args, **kwargs):
+        # self - это экземпляр класса CatImageProcessor
+        start_time = time.time()
+        
+        result = func(self, *args, **kwargs)
+        
+        end_time = time.time()
+        duration = end_time - start_time
+        print(f"Метод {func.__name__} выполнен за {duration:.4f} секунд.")
+        return result
+    return wrapper
+
 
 
 class ImageProcessing(interfaces.IImageProcessing):
@@ -130,19 +148,11 @@ class ImageProcessing(interfaces.IImageProcessing):
         #  Создаём выходное изображение с типом float64 для хранения точных результатов
         #  (аналог внутреннего буфера OpenCV с высокой точностью)
 
-        start, end = 0.0, 0.0
-        start = t.time()
-
         output_image = self._convolution(image, kernel, variant)
         output_image = np.clip(output_image, 0, 255) # Ограничиваем значения пикселей диапазоном [0, 255]
         output_image = output_image.astype(np.uint8) # Возвращаем изображение в формате uint8
 
-        end = t.time()
-
-        print(f"Execution time: {end - start}")
-
         return output_image
-
 
 
     def rgb_to_grayscale(self,
@@ -160,16 +170,11 @@ class ImageProcessing(interfaces.IImageProcessing):
         Returns:
             np.ndarray: Одноканальное изображение в оттенках серого.
         """
-        start, end = 0.0, 0.0
-        start = t.time()
 
         output_image = self._rgb_to_grayscale(image, var, variant)
         output_image = np.clip(output_image, 0, 255) # Ограничиваем значения пикселей диапазоном [0, 255]
 
         output_image = output_image.astype(np.uint8) # Возвращаем изображение в формате uint8
-        end = t.time()
-
-        print(f"Execution time: {end - start}")
 
         return output_image
 
@@ -252,17 +257,19 @@ class ImageProcessing(interfaces.IImageProcessing):
         Returns:
             np.ndarray: Изображение после гамма-коррекции.
         """
-        if variant == "new":
-            inv_gamma = 1.0 / gamma
+        inv_gamma = 1.0 / gamma
 
-            # Создаем таблицу поиска (LUT)
-            table = np.array( [ ( (i / 255.0) ** inv_gamma * 255) for i in range(256) ] )
+        # Создаем таблицу поиска (LUT)
+        table = np.array( [ ( (i / 255.0) ** inv_gamma * 255) for i in range(256) ] )
+        
+        if variant == "new": 
             output_image = table[image] # Применяем таблицу преобразования ко всему изображению
         else:
-            output_image = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
+            output_image = cv2.LUT(image, table)
 
         return output_image
     
+
 
     def gamma_correction(self, 
                           image: np.ndarray, 
@@ -281,16 +288,8 @@ class ImageProcessing(interfaces.IImageProcessing):
             np.ndarray: Изображение после гамма-коррекции.
         """
 
-        start, end = 0.0, 0.0
-        start = t.time()
-
         output_image = self._gamma_correction(image, gamma, variant).astype(np.uint8)
-        end = t.time()
-
-        print(f"Execution time: {end - start}")
-
         return output_image
-
 
 
     def edge_detection(self, 
@@ -309,9 +308,6 @@ class ImageProcessing(interfaces.IImageProcessing):
             np.ndarray: Одноканальное изображение с выделенными границами.
         """
 
-        start, end = 0.0, 0.0
-        start = t.time()
-        
         if variant == "new":
             gray = self._rgb_to_grayscale(image)
 
@@ -337,10 +333,6 @@ class ImageProcessing(interfaces.IImageProcessing):
         else:
              gray = self._rgb_to_grayscale(image, variant ="old")
              output_image = cv2.Canny(gray, 100, 200)
-    
-        end = t.time()
-
-        print(f"Execution time: {end - start}")
 
         return output_image
 
@@ -372,8 +364,7 @@ class ImageProcessing(interfaces.IImageProcessing):
             np.ndarray: Копия исходного цветного изображения, на которой найденные
                 углы отмечены красными точками.
         """
-        start, end = 0.0, 0.0
-        start = t.time()
+
         if variant == "new":
             gray = self._rgb_to_grayscale(image)
             
@@ -429,10 +420,6 @@ class ImageProcessing(interfaces.IImageProcessing):
             result = image.copy()
             result[dst > 0.01 * dst.max()] = [255, 0, 0]
             output_image = result
-
-        end = t.time()
-
-        print(f"Execution time: {end - start}")
 
         return output_image
 
@@ -497,18 +484,6 @@ class ImageProcessing(interfaces.IImageProcessing):
         # Преобразуем изображение в оттенки серого
         gray_img = self._rgb_to_grayscale(image)
         
-        # Применяем размытие для снижения шума
-        # Ghaussian_kernel_9x9 = np.array([
-        #     [1, 1, 2, 2, 4, 2, 2, 1, 1],
-        #     [1, 2, 2, 4, 8, 4, 2, 2, 1],
-        #     [2, 2, 4, 8, 16, 8, 4, 2, 2],
-        #     [2, 4, 8, 16, 32, 16, 8, 4, 2],
-        #     [4, 8, 16, 32, 64, 32, 16, 8, 4],
-        #     [2, 4, 8, 16, 32, 16, 8, 4, 2],
-        #     [2, 2, 4, 8, 16, 8, 4, 2, 2],
-        #     [1, 2, 2, 4, 8, 4, 2, 2, 1],
-        #     [1, 1, 2, 2, 4, 2, 2, 1, 1]
-        # ]) / 256
         Ghaussian_kernel_3x3 = np.array([[1, 2, 1], [2, 4, 2], [1, 2, 1]]) / 16
 
 
