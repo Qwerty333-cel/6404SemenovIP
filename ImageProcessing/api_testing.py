@@ -8,6 +8,8 @@ from implementation.image_processing import log_execution_time
 from requests.exceptions import HTTPError, Timeout, ConnectionError, RequestException
 from numpy.typing import NDArray
 import time
+from abc import ABC, abstractmethod
+
 
 image_processor_instance = img_proc()
 
@@ -326,7 +328,7 @@ class CatImage:
     @classmethod
     def from_api_payload(cls, item: Dict[str, Any], image: np.ndarray) -> "CatImage":
         """
-        Безопасно строит CatImage из JSON-объекта API + уже загруженного изображения.
+        Безопасно строит CatImage из JSON-объекта и уже загруженного изображения.
         Внутри нормализует поля и подставляет дефолты.
         """
         # Название породы (если есть) — берём первую
@@ -491,7 +493,10 @@ class CatImageProcessor:
                    filename: str, 
                    path: Optional[str] = None
                    ) -> None:
-        """Сохраняет изображение, гарантируя существование поддиректории."""
+        """
+        Сохраняет изображение, гарантируя существование поддиректории.
+        
+        """
         if path is None:
             # поддиректория по умолчанию: ./saved_images/run_YYYYmmdd_HHMM
             ts = TIME_NOW
@@ -510,7 +515,17 @@ class CatImageProcessor:
                           gamma: float = 3, 
                           kernel: np.ndarray = np.array([[-1, -1, -1], [-1, 9, -1], [-1, -1, -1]])
                           ) -> None:
-        """Обработка изображения кошки и сохранение исходника и результата"""
+        """
+        Функция обработки изображения кошки и сохранения исходников и результов.
+        
+        Args:
+            cats (Sequence[CatImage]): Список объектов CatImage для обработки
+            method (str): Метод обработки ("gray", "conv", "gamma", "edges", "corners", "circles", "add", "sub")
+            path (Optional[str]): Путь для сохранения изображений. Если None, используется путь по умолчанию.
+            gamma (float): Коэффициент гамма-преобразования (используется, если method="gamma")
+            kernel (np.ndarray): Ядро свёртки (используется, если method="conv")
+        Returns:   
+        """
         if method == "gray":
             for idx, cat in enumerate(cats, start=1):
                 self.save_image(cat.image, self.make_filename(idx, cat.breed, "original"), path=path)
