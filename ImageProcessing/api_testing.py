@@ -17,13 +17,53 @@ TIME_NOW = time.strftime("%Y%m%d_%H%M%S")
 HEADERS = {"Accept": "application/json"}
 DEFAULT_TIMEOUT = (5, 20)  # (connect, read)
 
-class CatImage:
+
+class _PositiveInt:
+    """Дескриптор для целых неотрицательных значений (ширина/высота)."""
+    def __init__(self, name: str):
+        self._name = f"_{name}"
+
+    def __get__(self, obj, owner):
+        if obj is None:
+            return self
+        return getattr(obj, self._name)
+
+    def __set__(self, obj, value):
+        iv = int(value)
+        if iv < 0:
+            raise ValueError(f"{self._name[1:]} must be >= 0, got {iv}")
+        setattr(obj, self._name, iv)
+
+
+class _NumpyArray:
+    """Дескриптор для проверки, что это именно numpy.ndarray."""
+    def __init__(self, name: str):
+        self._name = f"_{name}"
+
+    def __get__(self, obj, owner):
+        if obj is None:
+            return self
+        return getattr(obj, self._name)
+
+    def __set__(self, obj, value):
+        if not isinstance(value, np.ndarray):
+            raise TypeError(f"{self._name[1:]} must be a numpy.ndarray")
+        setattr(obj, self._name, value)
+
+
+class CatImage(ABC):
     """Класс для хранения данных изображения кошки и выполнения операций над ним"""
 
+    # Дескрипторы для проверки типов и значений
+    width: int = _PositiveInt("width")
+    height: int = _PositiveInt("height")
+    image: np.ndarray = _NumpyArray("image")
+
     def __init__(self, id: str, url: str, breed: str, width: int, height: int, image: np.ndarray):
-        self._id = id
-        self._url = url
-        self._breed = breed
+        self._id = str(id)
+        self._url = str(url)
+        self._breed = str(breed)
+        # Тут дескрипторы вызываются и проверяют корректность значений
         self._width = width
         self._height = height
         self._image = image
@@ -46,7 +86,12 @@ class CatImage:
     @property
     def image(self) -> np.ndarray:
         return self._image
-
+    
+    @property #Благодаря этому дескриптору, можно вызывать эту функцию как атрибут, то есть через .is_color
+    @abstractmethod
+    def is_color(self) -> bool:
+        """ True для цветных изображений, False для 2D (ч/б)."""
+        raise NotImplementedError
 
 
     def convolution_self(self, kernel: np.ndarray) -> np.ndarray:
@@ -60,8 +105,7 @@ class CatImage:
             np.ndarray: Изображение с наложенным фильтром свёртки
         """
 
-        return image_processor_instance.convolution(self._image.copy(), kernel, variant = "new")
-
+        return image_processor_instance.convolution(self._image.copy(), kernel, use_cv2 = False)
 
 
     def convolution_cv2(self, kernel: np.ndarray) -> np.ndarray:
@@ -75,10 +119,10 @@ class CatImage:
             np.ndarray: Изображение с наложенным фильтром свёртки
         """
 
-        return image_processor_instance.convolution(self._image.copy(), kernel, variant = "old")
-    
+        return image_processor_instance.convolution(self._image.copy(), kernel, use_cv2 = True)
 
 
+    @abstractmethod
     def to_grayscale_self(self) -> np.ndarray:
         """
         Преобразует изображение в градации серого
@@ -88,10 +132,11 @@ class CatImage:
             np.ndarray: Изображение в градациях серого (2D)
         """
 
-        return image_processor_instance.rgb_to_grayscale(self._image.copy(), variant = "new")
+        return image_processor_instance.rgb_to_grayscale(self._image.copy(), use_cv2 = False)
+        raise NotImplementedError
 
 
-
+    @abstractmethod
     def to_grayscale_cv2(self) -> np.ndarray:
         """
         Преобразует изображение в градации серого
@@ -101,9 +146,9 @@ class CatImage:
             np.ndarray: Изображение в градациях серого (2D)
         """
 
-        return image_processor_instance.rgb_to_grayscale(self._image.copy(), variant = "old")
+        return image_processor_instance.rgb_to_grayscale(self._image.copy(), use_cv2 = True)
+        raise NotImplementedError
     
-
 
     def gamma_correction_self(self, gamma: float) -> np.ndarray:
         """
@@ -116,9 +161,8 @@ class CatImage:
             np.ndarray: Изображение с наложенным гамма-преобразованем
         """
 
-        return image_processor_instance.gamma_correction(self._image.copy(), gamma, variant = "new")
+        return image_processor_instance.gamma_correction(self._image.copy(), gamma, use_cv2 = False)
 
-    
 
     def gamma_correction_cv2(self, gamma: float) -> np.ndarray:
         """
@@ -131,8 +175,7 @@ class CatImage:
             np.ndarray: Изображение с наложенным гамма-преобразованем
         """
 
-        return image_processor_instance.gamma_correction(self._image.copy(), gamma, variant = "old")
-    
+        return image_processor_instance.gamma_correction(self._image.copy(), gamma, use_cv2 = True)
 
 
     def edge_detection_self(self) -> np.ndarray:
@@ -144,8 +187,9 @@ class CatImage:
             np.ndarray: Ч/б изображение состоящее из границ изображения
         """
 
-        return image_processor_instance.edge_detection(self._image.copy(), variant = "new")
+        return image_processor_instance.edge_detection(self._image.copy(), use_cv2 = False)
     
+
     def edge_detection_cv2(self) -> np.ndarray:
         """
         Применяет поиск границ к изображению
@@ -155,8 +199,7 @@ class CatImage:
             np.ndarray: Ч/б изображение состоящее из границ изображения
         """
 
-        return image_processor_instance.edge_detection(self._image.copy(), variant = "old")
-    
+        return image_processor_instance.edge_detection(self._image.copy(), use_cv2 = True)
     
 
     def corner_detection_cv2(self) -> np.ndarray:
@@ -169,8 +212,7 @@ class CatImage:
         
         """
 
-        return image_processor_instance.corner_detection(self._image.copy(), variant = "old")
-
+        return image_processor_instance.corner_detection(self._image.copy(), use_cv2 = True)
 
 
     def corner_detection_self(self) -> np.ndarray:
@@ -182,9 +224,8 @@ class CatImage:
             np.ndarray: Изображение с наложенным фильтром поиска углов
         
         """
-        return image_processor_instance.corner_detection(self._image.copy(), variant = "new")
+        return image_processor_instance.corner_detection(self._image.copy(), use_cv2 = False)
     
-
 
     def circle_detection(self) -> np.ndarray:
         """
@@ -198,8 +239,8 @@ class CatImage:
         return image_processor_instance.circle_detection(self._image.copy())
     
 
-    def __add__(self, other: 'CatImage') -> np.ndarray:
-        variant = False
+    def __add__(self, other: "CatImage") -> np.ndarray:
+        use_cv2 = False
         """
         Сложение двух изображений
         
@@ -216,7 +257,7 @@ class CatImage:
             copy_self = self.image.copy()
             copy_other = other.image.copy()
 
-            if variant:
+            if use_cv2:
                     return cv2.add(copy_self, copy_other)
             
             else:
@@ -226,43 +267,48 @@ class CatImage:
                 return added_image.astype(np.uint8)
 
 
-    def adding_with_correction(self, other: 'CatImage', variant: bool = True, correction: bool = True) -> np.ndarray:
+    def adding_with_correction(self, 
+                               other: "CatImage", 
+                               use_cv2: bool = False, 
+                               correction: bool = True
+                               ) -> np.ndarray:
         """
         Сложение двух изображений
         
         Args:
             other (CatImage): Второе изображение для сложения
-            variant (bool): Если True, использовать cv2.add, иначе использовать свою реализацию через numpy
+            use_cv2 (bool): Если True, использовать cv2.add, иначе использовать свою реализацию через numpy
             correction (bool): При True подгоняет размер второго изобраения под первое при необходимости
         Returns:
             np.ndarray: Результат сложения двух изображений
         """
+        a = self.image.copy()
+        b = other.image.copy()
 
-        if (self._image.shape != other._image.shape) and not correction:
-            raise ValueError("Изображения должны быть одинакового размера для сложения.")
-        
+        # Проверим число каналов (если есть 3 оси — сравним последнюю)
+        if a.ndim != b.ndim or (a.ndim == 3 and a.shape[2] != b.shape[2]):
+            raise ValueError("Число каналов должно совпадать для сложения.")
+
+        if (a.shape[:2] != b.shape[:2]) and not correction:
+            raise ValueError("Размеры (H, W) должны совпадать, либо разрешите correction=True.")
+
+        if correction and a.shape[:2] != b.shape[:2]:
+            if a.shape < b.shape:
+                b = cv2.resize(b, (a.shape[1], a.shape[0]), cv2.INTER_AREA)
+            elif a.shape > b.shape:
+                b = cv2.resize(b, (a.shape[1], a.shape[0]), cv2.INTER_CUBIC)
+            else: pass
+
+        if use_cv2:
+            return cv2.add(a, b)
         else:
-            copy_self = self.image.copy()
-            copy_other = other.image.copy()
-            if correction:
-                if copy_self.shape < copy_other.shape:
-                    copy_other = cv2.resize(copy_other, (copy_self.shape[1], copy_self.shape[0]), cv2.INTER_AREA)
-                elif copy_self.shape > copy_other.shape:
-                    copy_other = cv2.resize(copy_other, (copy_self.shape[1], copy_self.shape[0]), cv2.INTER_CUBIC)
-                else: pass
-
-            if variant:
-                    return cv2.add(copy_self, copy_other)
-            
-            else:
-                # Альтернативный вариант сложения через numpy с обрезкой значений
-                added_image = copy_self.astype(np.int16) + copy_other.astype(np.int16)
-                np.clip(added_image, 0, 255, out=added_image)
-                return added_image.astype(np.uint8)
+            added = a.astype(np.int16) + b.astype(np.int16)
+            np.clip(added, 0, 255, out=added)
+            return added.astype(np.uint8)
 
 
-    def __sub__(self, other: 'CatImage') -> np.ndarray:
-        variant = False
+    def __sub__(self, other: "CatImage") -> np.ndarray:
+        use_cv2 = False
         """
         Вычитание одного изображения из другого
         
@@ -278,7 +324,7 @@ class CatImage:
             raise ValueError("Изображения должны быть одинакового размера для вычитания.")
         
         else:
-            if variant:
+            if use_cv2:
                 return cv2.subtract(copy_self, copy_other)
             
             else:
@@ -286,52 +332,43 @@ class CatImage:
                 subtracted_image = copy_self.astype(np.int16) - copy_other.astype(np.int16)
                 np.clip(subtracted_image, 0, 255, out=subtracted_image)
                 return subtracted_image.astype(np.uint8)
-            
 
-    def subtract_with_correction(self, other: 'CatImage', variant: bool = True, correction: bool = True) -> np.ndarray:
-        """
-        Вычитание одного изображения из другого с возможностью подгонки размеров
-        
-        Args:
-            other (CatImage): Вычитаемое изображение
-            variant (bool): Если True, использовать cv2.subtract, иначе использовать свою реализацию через numpy
-            correction (bool): При True подгоняет размер второго изобраения под первое при необходимости
-            
-        Returns:
-            np.ndarray: Результат вычитания одного изображения из другого
-        """
 
-        if (self._image.shape != other._image.shape) and not correction:
-            raise ValueError("Изображения должны быть одинакового размера для вычитания.")
-        
-        else:
-            copy_self = self.image.copy()
-            copy_other = other.image.copy()
-            if correction:
-                if copy_self.shape < copy_other.shape:
-                    copy_other = cv2.resize(copy_other, (copy_self.shape[1], copy_self.shape[0]), cv2.INTER_AREA)
-                elif copy_self.shape > copy_other.shape:
-                    copy_other = cv2.resize(copy_other, (copy_self.shape[1], copy_self.shape[0]), cv2.INTER_CUBIC)
+    def subtract_with_correction(self, 
+                                 other: "CatImage", 
+                                 use_cv2: bool = True, 
+                                 correction: bool = True
+                                 ) -> np.ndarray:
+            """Вычитание с подгонкой HxW (каналы должны совпадать)."""
+            a = self.image.copy()
+            b = other.image.copy()
+
+            if a.ndim != b.ndim or (a.ndim == 3 and a.shape[2] != b.shape[2]):
+                raise ValueError("Число каналов должно совпадать для вычитания.")
+
+            if correction and a.shape[:2] != b.shape[:2]:
+                if a.shape < b.shape:
+                    b = cv2.resize(b, (a.shape[1], a.shape[0]), cv2.INTER_AREA)
+                elif a.shape > b.shape:
+                    b = cv2.resize(b, (a.shape[1], a.shape[0]), cv2.INTER_CUBIC)
                 else: pass
 
-            if variant:
-                return cv2.subtract(copy_self, copy_other)
-            
+            if use_cv2:
+                return cv2.subtract(a, b)
             else:
-                # Альтернативный вариант вычитания через numpy с обрезкой значений
-                subtracted_image = copy_self.astype(np.int16) - copy_other.astype(np.int16)
-                np.clip(subtracted_image, 0, 255, out=subtracted_image)
-                return subtracted_image.astype(np.uint8)
+                sub = a.astype(np.int16) - b.astype(np.int16)
+                np.clip(sub, 0, 255, out=sub)
+                return sub.astype(np.uint8)
 
-
-
+    # Фабрика из нагрузки(JSON), возвращённой API после GET-запроса (возвращает подходящий подкласс)
     @classmethod
-    def from_api_payload(cls, item: Dict[str, Any], image: np.ndarray) -> "CatImage":
+    def from_api_payload(cls, item: Dict[str, Any], image: np.ndarray, *, as_gray: bool = False) -> "CatImage":
         """
-        Безопасно строит CatImage из JSON-объекта и уже загруженного изображения.
-        Внутри нормализует поля и подставляет дефолты.
+        Безопасно строит CatImage-потомка из JSON-объекта и уже загруженного изображения.
+        Если as_gray=True — создаём GrayCatImage (преобразуя к 2D).
+        Иначе — ColorCatImage.
         """
-        # Название породы (если есть) — берём первую
+        # Название породы (берём первую, если есть)
         breed_name = "Unknown Breed"
         breeds = item.get("breeds")
         if isinstance(breeds, list) and breeds:
@@ -339,28 +376,104 @@ class CatImage:
             if isinstance(first, dict):
                 breed_name = str(first.get("name", "Unknown Breed"))
 
-        # Остальные поля с базовыми значениями
-        return cls(
-            id=str(item.get("id", "")),
-            url=str(item.get("url", "")),
-            breed=breed_name,
-            width=int(item.get("width", 0) or 0),
-            height=int(item.get("height", 0) or 0),
-            image=image,
-        )
+        cid = str(item.get("id", ""))
+        url = str(item.get("url", ""))
+        width = int(item.get("width", 0) or 0)
+        height = int(item.get("height", 0) or 0)
 
-
+        if as_gray:
+            # превращаем в ч/б (2D)
+            gray = image_processor_instance.rgb_to_grayscale(image.copy(), use_cv2=True)
+            return CatImageGray(cid, url, breed_name, width, height, gray)
+        else:
+            # гарантируем 3-канальный BGR (3D) даже из 1-канального ч/б (2D)
+            if image.ndim == 2:
+                color = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
+            else:
+                color = image
+            return CatImageColor(cid, url, breed_name, width, height, color)
 
     def __str__(self) -> str:
-        """Возвращает поля класса в виде строки"""
-        return f"CatImage(id={self.id}, breed={self.breed}, url={self.url}, width={self.width}, height={self.height})"
+        """Возвращает информационные поля класса в виде строки."""
+
+        color = "color" if self.is_color else "gray"
+        h, w = self.image.shape[:2]
+        return f"CatImage<{color}>(id={self.id}, breed={self.breed}, size={w}x{h}, url={self.url})"
 
 
+
+class CatImageGray(CatImage):
+    """Класс для хранения данных ч/б изображений и операций над ними"""
+
+    @property
+    def is_color(self) -> bool:
+        """ True для цветных изображений (3D), False для ч/б (2D)."""
+        return False
+
+    def to_grayscale_self(self) -> np.ndarray:
+        """
+        Преобразует изображение в градации серого
+        
+        Args:
+        Returns:
+            np.ndarray: Изображение в градациях серого (2D)
+        """
+        return self.image  # Уже ч/б, возвращаем как есть
+    
+    def to_grayscale_cv2(self):
+        """
+        Преобразует изображение в градации серого
+        
+        Args:
+        Returns:
+            np.ndarray: Изображение в градациях серого (2D)
+        """
+        return self.image  # Уже ч/б, возвращаем как есть
+
+
+
+class CatImageColor(CatImage):
+    """Класс для хранения данных ч/б изображений и операций над ними"""
+
+    @property
+    def is_color(self) -> bool:
+        """ True для цветных изображений (3D), False для ч/б (2D)."""
+        return True
+
+
+    def to_grayscale_self(self) -> np.ndarray:
+        """
+        Преобразует изображение в градации серого
+        
+        Args:
+        Returns:
+            np.ndarray: Изображение в градациях серого (2D)
+        """
+
+        return image_processor_instance.rgb_to_grayscale(self._image.copy(), use_cv2 = False)
+
+
+    def to_grayscale_cv2(self) -> np.ndarray:
+        """
+        Преобразует изображение в градации серого
+        
+        Args:
+        Returns:
+            np.ndarray: Изображение в градациях серого (2D)
+        """
+
+        return image_processor_instance.rgb_to_grayscale(self._image.copy(), use_cv2 = True)
+
+    
 
 class CatImageProcessor:
     """Класс для работы с API, загрузки, обработки и сохранения изображений кошек"""
 
-    def __init__(self, api_key: Optional[str] = os.getenv("API_KEY"), url: Optional[str] = os.getenv("BASE_URL"), headers: Optional[Dict[str, str]] = HEADERS, timeout: Tuple[float, float] = DEFAULT_TIMEOUT):
+    def __init__(self, 
+                 api_key: Optional[str] = os.getenv("API_KEY"), 
+                 url: Optional[str] = os.getenv("BASE_URL"), 
+                 headers: Optional[Dict[str, str]] = HEADERS, 
+                 timeout: Tuple[float, float] = DEFAULT_TIMEOUT):
         self.headers = headers.copy()
         self.api_key = api_key
         self.base_url = url
@@ -379,7 +492,23 @@ class CatImageProcessor:
 
 
     @log_execution_time
-    def make_filename(self, index: int, breed: str, suffix: str, ext: str = "png") -> str:
+    def make_filename(self, 
+                      index: int, 
+                      breed: str, 
+                      suffix: str, 
+                      ext: str = "png") -> str:
+        """
+        Генерирует безопасное имя файла с учётом индекса, породы, суффикса и расширения.
+        
+        Args:
+            index (int): Порядковый номер изображения (начинается с 1)
+            breed (str): Название породы кошки
+            suffix (str): Суффикс для файла (например, "original" или метод обработки)
+            ext (str): Расширение файла (по умолчанию "png")
+        Returns:
+            str: Сформированное имя файла
+        """
+
         b = self._sanitize(breed.lower())
         return f"{index}_{b}_{suffix}.{ext}"
 
@@ -387,15 +516,24 @@ class CatImageProcessor:
 
     #в качестве параметров лучше указать "has_breeds": 1,"mime_types": "jpg,png" для получения изображений с породами и в нужных форматах
     @log_execution_time
-    def request_json(
-                     self,
+    def request_json(self,
                      path: str,     # Часть URL, которая идет после базового адреса
 
                      *,     # Звёздочка означает, что все последующие аргументы должны быть переданы по имени (например, api_key="my_key"), а не по позиции
-                     params: Optional[Dict[str, Any]]=None,     #Параметры для GET-запроса (то, что идет в URL после ?)(например limit). Optional означает, что можно передать словарь (Dict) или ничего (None).
-                     timeout: Optional[Tuple[float, float]]=None,      #Таймауты для подключения и чтения ответа (в секундах). Tuple означает, что это кортеж из двух чисел с плавающей точкой.
+                     params: Optional[Dict[str, Any]]=None,         #Optional означает, что можно передать словарь (Dict) или ничего (None).
+                     timeout: Optional[Tuple[float, float]]=None,   #Tuple означает, что это кортеж из двух чисел с плавающей точкой.
                     ) -> Dict[str, Any]:
-        """Функция для выполнения GET-запроса к API и обработки ответов"""
+        """
+        Функция для выполнения GET-запроса к API и обработки ответов
+        
+        Args:
+            path (str): Часть URL, которая идет после базового адреса
+            params (Optional[Dict[str, Any]]): Параметры для GET-запроса (то, что идет в URL после "?", например limit).
+            timeout (Optional[Tuple[float, float]]): Таймауты для подключения и чтения ответа (в секундах).
+        Returns:
+            Dict[str, Any]: Возвращает словарь типа:
+                            "ok": True, "status": status_code, "url": url, "data": payload
+        """
 
         url = f"{self.base_url}{path if path.startswith('/') else '/'+path}"
         try:
@@ -436,11 +574,15 @@ class CatImageProcessor:
 
 
     @log_execution_time
-    def load_image_from_url(
-                            self, 
-                            url: str, 
-                            ) -> np.ndarray:
-        """Функция для загрузки изображения через ссылку"""
+    def load_image_from_url(self, url: str) -> np.ndarray:
+        """
+        Функция для загрузки изображения через ссылку
+        
+        Args:
+            url (str): Ссылка на изображение
+        Returns:
+            np.ndarray: Изображение в формате cv2
+        """
 
         try:
             resp = requests.get(url, headers=self.headers, timeout=self.timeout)
@@ -459,8 +601,21 @@ class CatImageProcessor:
 
     @log_execution_time
     # NDArray — это специальный тип для аннотаций, а np.object_ уточняет, что dtype этого массива — object.
-    def fetch_cats(self, limit:int = 1, has_breeds: int = 1, mime_types: str = "jpg,png") -> NDArray[np.object_]:
-        """Функция для получения списка данных кошек с API и создания объектов CatImage"""
+    def fetch_cats(self, 
+                   limit:int = 1, 
+                   has_breeds: int = 1, 
+                   mime_types: str = "jpg,png"
+                   ) -> NDArray[np.object_]:
+        """
+        Функция для получения списка данных кошек с API и создания объектов CatImage
+        
+        Args:
+            limit (int): Количество изображений котиков
+            has_breeds (int): Имеется требуется ли описание (лучше не менять)
+            mime_types (str): Расширения картинок, которые мы хотим получать
+        Returns:
+            NDArray[np.object_]: Массив numpy наполненный объектами класса
+        """
 
         data = self.request_json("/images/search", params = {"limit": limit, "has_breeds": has_breeds,"mime_types": mime_types})
         
@@ -487,6 +642,7 @@ class CatImageProcessor:
         else:
             raise RuntimeError(f"Ошибка при запросе данных: {data.get('error', 'Unknown error')}")
         
+
     @log_execution_time
     def save_image(self, 
                    image: np.ndarray, 
@@ -496,11 +652,13 @@ class CatImageProcessor:
         """
         Сохраняет изображение, гарантируя существование поддиректории.
         
+        Args:
+            image (np.ndarray): Изображение, которое нужно сохранить
+            filename (str): Имя файла при сохранении
+            path (Optional[str]): Путь сохранения (по умолчанию это saved_images/run_YYYYmmdd_HHMM)
         """
         if path is None:
-            # поддиректория по умолчанию: ./saved_images/run_YYYYmmdd_HHMM
-            ts = TIME_NOW
-            path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "saved_images", f"run_{ts}")
+            path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "saved_images", f"run_{TIME_NOW}")
         os.makedirs(path, exist_ok=True)
         fullpath = os.path.join(path, filename)
         cv2.imwrite(fullpath, image)
@@ -580,6 +738,9 @@ class CatImageProcessor:
                     self.save_image(subtracted_image, self.make_filename(idx, cat.breed, "sub"), path=path)
                 except StopIteration:
                     print("Нужно минимум 2 изображения для вычитания.")
+
+        else:
+            raise ValueError(f"Неизвестный метод: {method}. Ожидаю один из: gray, conv, gamma, edges, corners, circles, add, sub.")
 
 
     

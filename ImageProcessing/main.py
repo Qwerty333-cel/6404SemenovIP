@@ -184,10 +184,10 @@ def run_local_flow(method: str, input_paths: list[str], out_path: str | None, ga
         )
 
         if method == "add":
-            result = cat1.adding_with_correction(cat2, variant=True, correction=True)
+            result = cat1.adding_with_correction(cat2, use_cv2=True, correction=True)
             suffix = "add"
         else:
-            result = cat1.subtract_with_correction(cat2, variant=True, correction=True)
+            result = cat1.subtract_with_correction(cat2, use_cv2=True, correction=True)
             suffix = "sub"
 
         save_path = out_path if out_path else f"{os.path.splitext(first_path)[0]}_{suffix}_result{os.path.splitext(first_path)[1] or '.png'}"

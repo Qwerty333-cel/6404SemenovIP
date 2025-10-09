@@ -59,7 +59,7 @@ class ImageProcessing(interfaces.IImageProcessing):
     def _convolution(self, 
                                   image: np.ndarray, 
                                   kernel: np.ndarray,
-                                  variant: str = "new") -> np.ndarray:
+                                  use_cv2: bool = False) -> np.ndarray:
         """
         Выполняет свёртку изображения с заданным ядром. 
         (альтернативная реализация для работы с float значениями)
@@ -69,12 +69,12 @@ class ImageProcessing(interfaces.IImageProcessing):
         Args:
             image (np.ndarray): Входное изображение (может быть цветным или чёрно-белым).
             kernel (np.ndarray): Ядро свёртки (матрица).
-            variant (str): свой вариант реализации(new) или через cv2(old)
+            use_cv2 (bool): Cвой вариант реализации(False) или через cv2(True)
 
         Returns:
             np.ndarray: Изображение после применения свёртки.
         """
-        if variant == "new":
+        if not use_cv2:
             #  Создаём выходное изображение с типом float64 для хранения точных результатов
             #  (аналог внутреннего буфера OpenCV с высокой точностью)
             output_image = np.zeros_like(image, dtype=np.float64)
@@ -130,7 +130,7 @@ class ImageProcessing(interfaces.IImageProcessing):
     def convolution(self, 
                      image: np.ndarray, 
                      kernel: np.ndarray,
-                     variant: str = "new") -> np.ndarray:
+                     use_cv2: bool = False) -> np.ndarray:
         """
         Выполняет свёртку изображения с заданным ядром.
 
@@ -139,7 +139,7 @@ class ImageProcessing(interfaces.IImageProcessing):
         Args:
             image (np.ndarray): Входное изображение (может быть цветным или чёрно-белым).
             kernel (np.ndarray): Ядро свёртки (матрица).
-            variant (str): свой вариант реализации(new) или через cv2(old)
+            use_cv2 (bool): Cвой вариант реализации(False) или через cv2(True)
 
         Returns:
             np.ndarray: Изображение после применения свёртки.
@@ -148,7 +148,7 @@ class ImageProcessing(interfaces.IImageProcessing):
         #  Создаём выходное изображение с типом float64 для хранения точных результатов
         #  (аналог внутреннего буфера OpenCV с высокой точностью)
 
-        output_image = self._convolution(image, kernel, variant)
+        output_image = self._convolution(image, kernel, use_cv2)
         output_image = np.clip(output_image, 0, 255) # Ограничиваем значения пикселей диапазоном [0, 255]
         output_image = output_image.astype(np.uint8) # Возвращаем изображение в формате uint8
 
@@ -158,7 +158,7 @@ class ImageProcessing(interfaces.IImageProcessing):
     def rgb_to_grayscale(self,
                           image: np.ndarray,
                           var: int = 0,
-                          variant: str = "new") -> np.ndarray:
+                          use_cv2: bool = False) -> np.ndarray:
         """
         Преобразует RGB-изображение в оттенки серого.
 
@@ -166,12 +166,13 @@ class ImageProcessing(interfaces.IImageProcessing):
 
         Args:
             image (np.ndarray): Входное RGB-изображение.
+            use_cv2 (bool): Cвой вариант реализации(False) или через cv2(True)
 
         Returns:
             np.ndarray: Одноканальное изображение в оттенках серого.
         """
 
-        output_image = self._rgb_to_grayscale(image, var, variant)
+        output_image = self._rgb_to_grayscale(image, var, use_cv2)
         output_image = np.clip(output_image, 0, 255) # Ограничиваем значения пикселей диапазоном [0, 255]
 
         output_image = output_image.astype(np.uint8) # Возвращаем изображение в формате uint8
@@ -181,22 +182,25 @@ class ImageProcessing(interfaces.IImageProcessing):
 
     def _rgb_to_grayscale(self,
                           image: np.ndarray,
-                          var: int = 0,
-                          variant = "new") -> np.ndarray:
+                          variant: bool = False,
+                          use_cv2: bool = False) -> np.ndarray:
         """
         Преобразует RGB-изображение в оттенки серого. 
-        (альтернативная реализация для работы с float значениями)
+        (внутренняя реализация для работы с float значениями)
 
         Использует взвешенное среднее для преобразования каждого пикселя.
 
         Args:
             image (np.ndarray): Входное RGB-изображение.
-
+            variant (bool): Выбор своего варианта реализации:
+                                                                True - первый(через np.dot), 
+                                                                False - второй(через ручное вычисление)
+            use_cv2 (bool): Cвой вариант реализации(False) или через cv2(True)
         Returns:
             np.ndarray: Одноканальное изображение в оттенках серого.
         """
     
-        if variant == "new":
+        if not use_cv2:
             #Коэффициенты для взвешенного среднего
             r_coeff = 0.299
             g_coeff = 0.587
@@ -204,7 +208,7 @@ class ImageProcessing(interfaces.IImageProcessing):
            
             if image.ndim == 3:
                 
-                if var == 1:
+                if variant:
                     coeffs = np.array([b_coeff, g_coeff, r_coeff])
 
                     # Умножаем каждый канал на его коэффициент и суммируем по последней оси (оси каналов)
@@ -244,7 +248,7 @@ class ImageProcessing(interfaces.IImageProcessing):
     def _gamma_correction(self, 
                           image: np.ndarray, 
                           gamma: float,
-                          variant: str = "new") -> np.ndarray:
+                          use_cv2: bool = False) -> np.ndarray:
         """
         Применяет гамма-коррекцию к изображению.
 
@@ -253,6 +257,7 @@ class ImageProcessing(interfaces.IImageProcessing):
         Args:
             image (np.ndarray): Входное изображение.
             gamma (float): Коэффициент гамма-коррекции (>0).
+            use_cv2 (bool): Cвой вариант реализации(False) или через cv2(True)
 
         Returns:
             np.ndarray: Изображение после гамма-коррекции.
@@ -262,7 +267,7 @@ class ImageProcessing(interfaces.IImageProcessing):
         # Создаем таблицу поиска (LUT)
         table = np.array( [ ( (i / 255.0) ** inv_gamma * 255) for i in range(256) ] )
         
-        if variant == "new": 
+        if not use_cv2: 
             output_image = table[image] # Применяем таблицу преобразования ко всему изображению
         else:
             output_image = cv2.LUT(image, table)
@@ -272,9 +277,9 @@ class ImageProcessing(interfaces.IImageProcessing):
 
 
     def gamma_correction(self, 
-                          image: np.ndarray, 
-                          gamma: float,
-                          variant: str = "new") -> np.ndarray:
+                         image: np.ndarray, 
+                         gamma: float,
+                         use_cv2: bool = False) -> np.ndarray:
         """
         Применяет гамма-коррекцию к изображению.
 
@@ -283,18 +288,19 @@ class ImageProcessing(interfaces.IImageProcessing):
         Args:
             image (np.ndarray): Входное изображение.
             gamma (float): Коэффициент гамма-коррекции (>0).
+            use_cv2 (bool): Cвой вариант реализации(False) или через cv2(True)
 
         Returns:
             np.ndarray: Изображение после гамма-коррекции.
         """
 
-        output_image = self._gamma_correction(image, gamma, variant).astype(np.uint8)
+        output_image = self._gamma_correction(image, gamma, use_cv2).astype(np.uint8)
         return output_image
 
 
     def edge_detection(self, 
                        image: np.ndarray,
-                       variant: str = "new") -> np.ndarray:
+                       use_cv2: bool = False) -> np.ndarray:
         """
         Выполняет обнаружение границ на изображении.
 
@@ -303,12 +309,13 @@ class ImageProcessing(interfaces.IImageProcessing):
 
         Args:
             image (np.ndarray): Входное изображение (RGB).
+            use_cv2 (bool): Cвой вариант реализации(False) или через cv2(True)
 
         Returns:
             np.ndarray: Одноканальное изображение с выделенными границами.
         """
 
-        if variant == "new":
+        if not use_cv2:
             gray = self._rgb_to_grayscale(image)
 
             # Ядро для поиска вертикальных границ (чувствительно к изменениям по X)
@@ -331,7 +338,7 @@ class ImageProcessing(interfaces.IImageProcessing):
             output_image = sobel_normalized.astype(np.uint8) # Возвращаем изображение в формате uint8
 
         else:
-             gray = self._rgb_to_grayscale(image, variant ="old")
+             gray = self._rgb_to_grayscale(image, use_cv2 = True)
              output_image = cv2.Canny(gray, 100, 200)
 
         return output_image
@@ -341,7 +348,7 @@ class ImageProcessing(interfaces.IImageProcessing):
                          image: np.ndarray, 
                          k: float = 0.04, 
                          threshold_ratio: float = 0.03,
-                         variant: str = "new") -> np.ndarray:
+                         use_cv2: bool = False) -> np.ndarray:
         """
         Выполняет обнаружение углов на изображении.
 
@@ -359,13 +366,14 @@ class ImageProcessing(interfaces.IImageProcessing):
                 слабых углов. Порог вычисляется как `R.max() * threshold_ratio`.
                 Значение по умолчанию: 0.01 (то есть, отбираются углы "силой"
                 в 1% от самого сильного).
+            use_cv2 (bool): Cвой вариант реализации(False) или через cv2(True)
 
         Returns:
             np.ndarray: Копия исходного цветного изображения, на которой найденные
                 углы отмечены красными точками.
         """
 
-        if variant == "new":
+        if not use_cv2:
             gray = self._rgb_to_grayscale(image)
             
 
@@ -413,7 +421,7 @@ class ImageProcessing(interfaces.IImageProcessing):
             output_image = result_image.astype(np.uint8) # Возвращаем изображение в формате uint8
             
         else:
-            gray = self._rgb_to_grayscale(image, variant = "old")
+            gray = self._rgb_to_grayscale(image, use_cv2 = True)
             gray = np.float32(gray)
             dst = cv2.cornerHarris(gray, 2, 3, 0.04)
             dst = cv2.dilate(dst, None)
