@@ -40,6 +40,7 @@ from dotenv import load_dotenv
 
 # Локальные модули
 from implementation.image_processing import ImageProcessing
+from api_testing import CatImageColor, CatImageGray
 import api_testing  # содержит CatImageProcessor из твоего модуля
 
 # --- Простые константы ---
@@ -55,7 +56,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p.add_argument(
         "method",
-        choices=["edges", "corners", "circles", "conv", "gamma", "gray", "add", "sub"],
+        choices=["edges", "corners", "circles", "conv", "gamma", "gray", "add", "sub", "str"],
         help="Метод обработки.",
     )
     p.add_argument(
@@ -81,6 +82,16 @@ def build_parser() -> argparse.ArgumentParser:
         default=DEFAULT_GAMMA,
         help=f"Значение гамма для метода 'gamma' (по умолчанию {DEFAULT_GAMMA}).",
     )
+    p.add_argument(
+        "--as-gray",
+        action="store_true",
+        help="В API-режиме: создавать объекты ч/б (CatImageGray) вместо цветных."
+    )
+    p.add_argument(
+        "--corr",
+        action="store_true",
+        help="Корректируем изображения при сложении/вычитании(подгоняем размер второго изображение под первое)"
+    )
     return p
 
 
@@ -96,10 +107,13 @@ def ensure_env_for_api() -> tuple[str, str]:
     return api_key, base_url
 
 
-def run_api_flow(method: str, count_str: str | None, outdir: str | None, gamma: float) -> None:
+def run_api_flow(method: str, count_str: str | None, outdir: str | None, gamma: float, as_gray: bool , corr: bool) -> None:
     """Обработка через API: грузим N изображений и сохраняем результаты пачкой."""
     api_key, base_url = ensure_env_for_api()
-
+    if not count_str:
+        count_str = 1
+    if (method == "add" or method == "sub") and int(count_str) <=1:
+        raise ValueError("Для сложения/вычитания нужно минимум 2 изображения!")
     # Количество изображений
     if count_str is None:
         count = 1
@@ -114,11 +128,11 @@ def run_api_flow(method: str, count_str: str | None, outdir: str | None, gamma: 
         sys.exit(1)
 
     # Инициализация процессора
-    processor = api_testing.CatImageProcessor(api_key=api_key, url=base_url)
+    processor = api_testing.CatImageProcessor(api_key=api_key, url=base_url, correction = corr)
 
     try:
         print(f"[API] Запрос {count} изображений из TheCatAPI...")
-        cats = processor.fetch_cats(limit=count)  # has_breeds=1, mime_types='jpg,png' внутри по умолчанию
+        cats = processor.fetch_cats(limit=count, as_gray=as_gray)  # has_breeds=1, mime_types='jpg,png' внутри по умолчанию
         if cats.size == 0:
             print("[API] Не удалось получить изображения.")
             return
@@ -174,11 +188,11 @@ def run_local_flow(method: str, input_paths: list[str], out_path: str | None, ga
         def stem(p: str) -> str:
             return os.path.splitext(os.path.basename(p))[0]
 
-        cat1 = api_testing.CatImage(
+        cat1 = api_testing.CatImageColor(
             id="local1", url=first_path, breed=stem(first_path),
             width=img1.shape[1], height=img1.shape[0], image=img1
         )
-        cat2 = api_testing.CatImage(
+        cat2 = api_testing.CatImageColor(
             id="local2", url=second_path, breed=stem(second_path),
             width=img2.shape[1], height=img2.shape[0], image=img2
         )
@@ -200,33 +214,42 @@ def run_local_flow(method: str, input_paths: list[str], out_path: str | None, ga
         print("[LOCAL] Предупреждение: передано несколько файлов, будет обработан только первый.")
 
     proc = ImageProcessing()
-    result = None
+    result_self = None
+    result_cv2 = None
 
     print(f"[LOCAL] Применение '{method}' к '{first_path}'...")
     if method == "edges":
-        result = proc.edge_detection(img1)
+        result_self = proc.edge_detection(img1.copy())
+        result_cv2 = proc.edge_detection(img1.copy(), use_cv2=True)
     elif method == "corners":
-        result = proc.corner_detection(img1)
+        result_self = proc.corner_detection(img1.copy())
+        result_cv2 = proc.corner_detection(img1.copy(), use_cv2=True)
     elif method == "circles":
-        result = proc.circle_detection(img1)
+        result_self = proc.circle_detection(img1.copy())
     elif method == "conv":
-        result = proc.convolution(img1, DEFAULT_KERNEL)
+        result_self = proc.convolution(img1.copy(), DEFAULT_KERNEL)
+        result_cv2 = proc.convolution(img1.copy(), DEFAULT_KERNEL, use_cv2=True)
     elif method == "gamma":
-        result = proc.gamma_correction(img1, gamma)
+        result_self = proc.gamma_correction(img1.copy(), gamma)
+        result_cv2 = proc.gamma_correction(img1.copy(), gamma, use_cv2=True)
     elif method == "gray":
-        result = proc.rgb_to_grayscale(img1)
+        result_self = proc.rgb_to_grayscale(img1.copy())
+        result_cv2 = proc.rgb_to_grayscale(img1.copy(), use_cv2=True)
     else:
         print(f"[LOCAL] Метод '{method}' не поддержан в локальном режиме.")
         return
 
-    if result is None:
+    if (result_self is None) or (result_cv2 is None):
         print(f"[LOCAL] Метод '{method}' не вернул результат.")
         return
 
-    save_path = out_path if out_path else f"{os.path.splitext(first_path)[0]}_{method}_result{os.path.splitext(first_path)[1] or '.png'}"
-    ok = cv2.imwrite(save_path, result)
-    print(f"[LOCAL] Результат сохранён в: {save_path}" if ok else "[LOCAL] Не удалось сохранить результат.")
-
+    save_path_self = f"{out_path}_self.png" if out_path else f"{os.path.splitext(first_path)[0]}_{method}_result_self_{os.path.splitext(first_path)[1] or '.png'}"
+    ok_self = cv2.imwrite(save_path_self, result_self)
+    print(f"[LOCAL] Результат сохранён в: {save_path}" if ok_self else "[LOCAL] Не удалось сохранить результат.")
+    
+    save_path_cv2 = f"{out_path}_cv2.png" if out_path else f"{os.path.splitext(first_path)[0]}_{method}_result_cv2_{os.path.splitext(first_path)[1] or '.png'}"
+    ok_cv2 = cv2.imwrite(save_path_cv2, result_cv2)
+    print(f"[LOCAL] Результат сохранён в: {save_path}" if ok_cv2 else "[LOCAL] Не удалось сохранить результат.")
 
 
 def main() -> None:
@@ -235,7 +258,7 @@ def main() -> None:
 
     if args.source == "API":
         count_str = args.inputs[0] if args.inputs else None
-        run_api_flow(method=args.method, count_str=count_str, outdir=args.output, gamma=args.gamma)
+        run_api_flow(method=args.method, count_str=count_str, outdir=args.output, gamma=args.gamma, as_gray=args.as_gray)
     else:
         run_local_flow(method=args.method, input_paths=args.inputs, out_path=args.output, gamma=args.gamma)
 

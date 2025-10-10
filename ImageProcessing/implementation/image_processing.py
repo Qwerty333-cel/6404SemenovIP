@@ -125,7 +125,7 @@ class ImageProcessing(interfaces.IImageProcessing):
 
         return output_image
 
-
+    @log_execution_time
     # Сделать вторую функцию с возможностью выбора ядра по имени
     def convolution(self, 
                      image: np.ndarray, 
@@ -154,7 +154,7 @@ class ImageProcessing(interfaces.IImageProcessing):
 
         return output_image
 
-
+    @log_execution_time
     def rgb_to_grayscale(self,
                           image: np.ndarray,
                           var: int = 0,
@@ -236,11 +236,14 @@ class ImageProcessing(interfaces.IImageProcessing):
                             g_pix = mid_image[y,x,1] * g_coeff
                             b_pix = mid_image[y,x,0] * b_coeff
                             
-                            output_image[y,x] = 255 - (b_pix + g_pix + r_pix) #Собираем новое значение пикселя из трёх каналов
+                            output_image[y,x] = (b_pix + g_pix + r_pix) #Собираем новое значение пикселя из трёх каналов
             else:
                 output_image = image
         else:
-            output_image = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
+            if image.ndim == 3:
+                output_image = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
+            else:
+                output_image = image
         return output_image # Возвращаем float для точности
 
 
@@ -275,7 +278,7 @@ class ImageProcessing(interfaces.IImageProcessing):
         return output_image
     
 
-
+    @log_execution_time
     def gamma_correction(self, 
                          image: np.ndarray, 
                          gamma: float,
@@ -297,7 +300,7 @@ class ImageProcessing(interfaces.IImageProcessing):
         output_image = self._gamma_correction(image, gamma, use_cv2).astype(np.uint8)
         return output_image
 
-
+    @log_execution_time
     def edge_detection(self, 
                        image: np.ndarray,
                        use_cv2: bool = False) -> np.ndarray:
@@ -343,11 +346,11 @@ class ImageProcessing(interfaces.IImageProcessing):
 
         return output_image
 
-
+    @log_execution_time
     def corner_detection(self, 
                          image: np.ndarray, 
                          k: float = 0.04, 
-                         threshold_ratio: float = 0.03,
+                         threshold_ratio: float = 0.01,
                          use_cv2: bool = False) -> np.ndarray:
         """
         Выполняет обнаружение углов на изображении.
@@ -409,6 +412,8 @@ class ImageProcessing(interfaces.IImageProcessing):
 
             # Находим углы и рисуем их на исходном изображении
             result_image = image.copy()
+            if result_image.ndim == 2:
+                result_image = cv2.cvtColor(result_image, cv2.COLOR_GRAY2BGR)
             threshold = threshold_ratio * R.max()
 
             # Находим координаты всех пикселей, которые превышают порог
@@ -450,7 +455,10 @@ class ImageProcessing(interfaces.IImageProcessing):
             color (tuple): Цвет в формате BGR, например (0, 255, 0) для зелёного.
             thickness (int): Толщина линии.
         """
-        height, width, _ = image.shape
+        
+        height, width = image.shape[:2]
+        if image.ndim == 2:
+            color = 255
         
         # Используем параметрическое уравнение окружности
         # x = x_c + r * cos(a)
@@ -465,7 +473,7 @@ class ImageProcessing(interfaces.IImageProcessing):
                 if 0 <= y < height and 0 <= x < width:
                     image[y, x] = color
 
-
+    @log_execution_time
     def circle_detection(self, 
                          image: np.ndarray, 
                          min_radius: int = 15, 
@@ -554,7 +562,8 @@ class ImageProcessing(interfaces.IImageProcessing):
         
         # Отрисовка результатов
         output_image = image.copy()
-        
+        if output_image.ndim == 2:
+                output_image = cv2.cvtColor(output_image, cv2.COLOR_GRAY2BGR)
         # Рисуем найденные окружности
         for x, y, r in found_circles:
             # Окружность зелёным цветом
