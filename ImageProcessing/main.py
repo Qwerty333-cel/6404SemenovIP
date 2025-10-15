@@ -38,10 +38,9 @@ import numpy as np
 import cv2
 from dotenv import load_dotenv
 
-# Локальные модули
 from implementation.image_processing import ImageProcessing
 from api_testing import CatImageColor, CatImageGray
-import api_testing  # содержит CatImageProcessor из твоего модуля
+import api_testing  # содержит CatImageProcessor 
 
 # --- Простые константы ---
 DEFAULT_KERNEL = np.array([[-1, -1, -1],
