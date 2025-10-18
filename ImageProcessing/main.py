@@ -106,7 +106,7 @@ def ensure_env_for_api() -> tuple[str, str]:
     return api_key, base_url
 
 
-def run_api_flow(method: str, count_str: str | None, outdir: str | None, gamma: float, as_gray: bool , corr: bool) -> None:
+def run_api_flow(method: str, count_str: str | None, outdir: str | None, gamma: float, as_gray: bool , corr: bool = False) -> None:
     """Обработка через API: грузим N изображений и сохраняем результаты пачкой."""
     api_key, base_url = ensure_env_for_api()
     if not count_str:
@@ -127,7 +127,10 @@ def run_api_flow(method: str, count_str: str | None, outdir: str | None, gamma: 
         sys.exit(1)
 
     # Инициализация процессора
-    processor = api_testing.CatImageProcessor(api_key=api_key, url=base_url, correction = corr)
+    if corr:
+        processor = api_testing.CatImageProcessor(api_key=api_key, url=base_url, correction = corr)
+    else:
+        processor = api_testing.CatImageProcessor(api_key=api_key, url=base_url)
 
     try:
         print(f"[API] Запрос {count} изображений из TheCatAPI...")
