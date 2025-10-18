@@ -52,3 +52,19 @@ def first_task():
     print(f"Лучшие продажи были в {max_year} году и составляли {max_val:.2f} млн. долларов\nХудшие продажи были в в {min_year} году и составляли {min_val:.2f} млн. долларов")
 
 
+def get_publishers_reviews_gen(readfile_gen):
+    for df in readfile_gen:
+        publishers_reviews = pd.DataFrame({'publishers': df["Metadata.Publishers"], 'reviews': df["Metrics.Review Score"]})
+        publishers_reviews = publishers_reviews.dropna()
+        yield publishers_reviews
+
+def disp_reviews_gen(get_publishers_reviews):
+    for publishers_reviews in get_publishers_reviews:
+        disp_reviews = publishers_reviews.groupby("publishers")['reviews'].var()
+        yield disp_reviews.dropna()
+
+def get_tipbottom_reviews(disp_reviews_gen):
+    for disp_reviews in disp_reviews_gen:
+        top_3 = disp_reviews.sort_values(ascending = False).head(3) # ascending = False - сортировка по убыванию
+        bottom_3 = disp_reviews.sort_values(ascending = True).head(3) # ascending = True - сортировка по возрастанию
+        
