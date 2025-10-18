@@ -7,3 +7,4 @@ venv/
 *.rar
 *.ipynb
 saved_images/
+*.csv
