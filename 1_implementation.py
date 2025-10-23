@@ -63,8 +63,17 @@ def disp_reviews_gen(get_publishers_reviews):
         disp_reviews = publishers_reviews.groupby("publishers")['reviews'].var()
         yield disp_reviews.dropna()
 
-def get_tipbottom_reviews(disp_reviews_gen):
+def get_topbottom_reviews(disp_reviews_gen):
+    top_3 = pd.Series()
     for disp_reviews in disp_reviews_gen:
         top_3 = disp_reviews.sort_values(ascending = False).head(3) # ascending = False - сортировка по убыванию
+        print(top_3)
         bottom_3 = disp_reviews.sort_values(ascending = True).head(3) # ascending = True - сортировка по возрастанию
-        
+
+get_topbottom_reviews(
+                    disp_reviews_gen(
+                                    get_publishers_reviews_gen(
+                                                                readfile_gen()
+                                                              )
+                                    )
+                    )
