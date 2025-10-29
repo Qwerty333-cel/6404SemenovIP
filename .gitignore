@@ -2,8 +2,9 @@
 results/
 __pycache__/
 venv/
+.env
 *.pyc
 *.rar
 *.ipynb
-.env
+saved_images/
 *.csv
