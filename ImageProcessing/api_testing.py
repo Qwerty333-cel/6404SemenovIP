@@ -554,7 +554,7 @@ class CatImageProcessor:
             return {"ok": False, "error": f"RequestException: {e}", "status": None, "url": url}
 
 
-
+    # переписать с использованием aiohttp
     @log_execution_time
     def loadimage_from_url(self, url: str) -> np.ndarray:
         """
@@ -580,7 +580,7 @@ class CatImageProcessor:
             raise RuntimeError(f"Ошибка при загрузке изображения: {e}")
         
 
-
+    # распараллелить скачевание изображение и преобразование в объекты класса catImage
     @log_execution_time
     # NDArray — это специальный тип для аннотаций, а np.object_ уточняет, что dtype этого массива — object.
     def fetch_cats(self, 
@@ -626,7 +626,7 @@ class CatImageProcessor:
         else:
             raise RuntimeError(f"Ошибка при запросе данных: {data.get('error', 'Unknown error')}")
         
-
+    # переписать с использованием aiofiles
     @log_execution_time
     def save_image(self, 
                    image: np.ndarray, 
