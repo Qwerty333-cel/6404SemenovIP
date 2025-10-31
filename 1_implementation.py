@@ -105,7 +105,7 @@ def publisher_stats_calculator(data_generator: Iterator[pd.DataFrame]) -> Iterat
         pd.DataFrame: DataFrame с частичной статистикой по издателям
     """
     for dataframe in data_generator:
-        clean_data = dataframe[[PUBLISHER_COL, REVIEW_COL]].dropna(subset=[PUBLISHER_COL, REVIEW_COL])
+        clean_data = dataframe[[PUBLISHER_COL, REVIEW_COL]].dropna()
         if clean_data.empty:
             continue
         
@@ -312,7 +312,7 @@ def rating_trends_visualization(counts_df: pd.DataFrame, rolling_df: Optional[pd
     fig, ax = plt.subplots(figsize=(14, 8))
     year_values = counts_df.index
     
-    colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd']
+    colors = ['#1f77b4', '#ff7f0e', '#2ca02c']
     
     for i, rating in enumerate(counts_df.columns):
         color = colors[i % len(colors)]
