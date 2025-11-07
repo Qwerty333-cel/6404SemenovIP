@@ -24,11 +24,12 @@ DEFAULT_TIMEOUT = (5, 20)  # (connect, read)
 class CatImage(ABC):
     """Класс для хранения данных изображения кошки и выполнения операций над ним"""
 
-    def __init__(self, id: str, url: str, breed: str, width: int, height: int, image: np.ndarray):
+    def __init__(self, id: str, url: str, breed: str, width: int, height: int, image: np.ndarray, index: int):
         self._id = str(id)
         self._url = str(url)
         self._breed = str(breed)
         self._image = image
+        self._index = index
 
     @property
     def id(self) -> str:
@@ -53,7 +54,11 @@ class CatImage(ABC):
         # H — первый элемент
         return int(self._image.shape[0])
     
-
+    @property
+    def index(self) -> int:
+        return self._index
+    
+        
     @property #Благодаря этому дескриптору, можно вызывать эту функцию как атрибут, то есть через .is_color
     @abstractmethod
     def is_color(self) -> bool:
@@ -331,7 +336,8 @@ class CatImage(ABC):
                          item: Dict[str, Any], 
                          image: np.ndarray, 
                          *, 
-                         as_gray: bool = False
+                         as_gray: bool = False,
+                         idx: int
                          ) -> "CatImage":
         """
         Безопасно строит класс-наследник от CatImage из JSON-объекта и уже загруженного изображения.
@@ -359,15 +365,14 @@ class CatImage(ABC):
         url = str(item.get("url", ""))
         width = int(item.get("width", 0) or 0)
         height = int(item.get("height", 0) or 0)
-
         if as_gray or image.ndim == 2:
             # превращаем в ч/б (2D)
             gray = image_processor.rgb_to_grayscale(image.copy(), use_cv2=True)
-            return CatImageGray(cid, url, breed_name, width, height, gray)
+            return CatImageGray(cid, url, breed_name, width, height, gray, index = idx)
         else:
             # возвращаем цветое изображение (3D)
             color = image
-            return CatImageColor(cid, url, breed_name, width, height, color)
+            return CatImageColor(cid, url, breed_name, width, height, color, index = idx)
 
     def __str__(self) -> str:
         """
@@ -616,7 +621,7 @@ class CatImageProcessor:
                 item = data["data"][i]
                 try:
                     img = self.loadimage_from_url(item.get("url", ""))
-                    cat = CatImage.from_api_payload(item, img, as_gray=as_gray) # Делегируем разбор JSON-объекта в класс CatImage
+                    cat = CatImage.from_api_payload(item, img, as_gray=as_gray, idx = i+1) # Делегируем разбор JSON-объекта в класс CatImage
                     cats.append(cat)
                 except Exception as e:
                     print(f"Ошибка при обработке данных: {e}")
@@ -670,64 +675,64 @@ class CatImageProcessor:
         """
         
         if method == "gray":
-            for idx, cat in enumerate(cats, start=1):
-                self.save_image(cat.image, self.make_filename(idx, cat.breed, "original"), path=path)
-                self.save_image(cat.to_grayscale_cv2(), self.make_filename(idx, cat.breed, f"{method}_cv2"), path=path)
-                self.save_image(cat.to_grayscale_self(), self.make_filename(idx, cat.breed, f"{method}_self"), path=path)
+            for cat in cats:
+                self.save_image(cat.image, self.make_filename(cat.index, cat.breed, "original"), path=path)
+                self.save_image(cat.to_grayscale_cv2(), self.make_filename(cat.index, cat.breed, f"{method}_cv2"), path=path)
+                self.save_image(cat.to_grayscale_self(), self.make_filename(cat.index, cat.breed, f"{method}_self"), path=path)
 
         elif (method == "conv"):
-            for idx, cat in enumerate(cats, start=1):
-                self.save_image(cat.image, self.make_filename(idx, cat.breed, "original"), path=path)
-                self.save_image(cat.convolution_cv2(kernel=kernel), self.make_filename(idx, cat.breed, f"{method}_cv2"), path=path)
-                self.save_image(cat.convolution_self(kernel=kernel), self.make_filename(idx, cat.breed, f"{method}_self"), path=path)
+            for cat in cats:
+                self.save_image(cat.image, self.make_filename(cat.index, cat.breed, "original"), path=path)
+                self.save_image(cat.convolution_cv2(kernel=kernel), self.make_filename(cat.index, cat.breed, f"{method}_cv2"), path=path)
+                self.save_image(cat.convolution_self(kernel=kernel), self.make_filename(cat.index, cat.breed, f"{method}_self"), path=path)
         
         elif (method == "gamma"):
-            for idx, cat in enumerate(cats, start=1):
-                self.save_image(cat.image, self.make_filename(idx, cat.breed, "original"), path=path)
-                self.save_image(cat.gamma_correction_cv2(gamma = gamma), self.make_filename(idx, cat.breed, f"{method}_cv2"), path=path)
-                self.save_image(cat.gamma_correction_self(gamma = gamma), self.make_filename(idx, cat.breed, f"{method}_self"), path=path)
+            for cat in cats:
+                self.save_image(cat.image, self.make_filename(cat.index, cat.breed, "original"), path=path)
+                self.save_image(cat.gamma_correction_cv2(gamma = gamma), self.make_filename(cat.index, cat.breed, f"{method}_cv2"), path=path)
+                self.save_image(cat.gamma_correction_self(gamma = gamma), self.make_filename(cat.index, cat.breed, f"{method}_self"), path=path)
        
         elif (method == "edges"):
-            for idx, cat in enumerate(cats, start=1):
-                self.save_image(cat.image, self.make_filename(idx, cat.breed, "original"), path=path)
-                self.save_image(cat.edge_detection_cv2(), self.make_filename(idx, cat.breed, f"{method}_cv2"), path=path)
-                self.save_image(cat.edge_detection_self(), self.make_filename(idx, cat.breed, f"{method}_self"), path=path)
+            for cat in cats:
+                self.save_image(cat.image, self.make_filename(cat.index, cat.breed, "original"), path=path)
+                self.save_image(cat.edge_detection_cv2(), self.make_filename(cat.index, cat.breed, f"{method}_cv2"), path=path)
+                self.save_image(cat.edge_detection_self(), self.make_filename(cat.index, cat.breed, f"{method}_self"), path=path)
        
         elif (method == "corners"):
-            for idx, cat in enumerate(cats, start=1):
-                self.save_image(cat.image, self.make_filename(idx, cat.breed, "original"), path=path)
-                self.save_image(cat.corner_detection_cv2(), self.make_filename(idx, cat.breed, f"{method}_cv2"), path=path)
-                self.save_image(cat.corner_detection_self(), self.make_filename(idx, cat.breed, f"{method}_self"), path=path)
+            for cat in cats:
+                self.save_image(cat.image, self.make_filename(cat.index, cat.breed, "original"), path=path)
+                self.save_image(cat.corner_detection_cv2(), self.make_filename(cat.index, cat.breed, f"{method}_cv2"), path=path)
+                self.save_image(cat.corner_detection_self(), self.make_filename(cat.index, cat.breed, f"{method}_self"), path=path)
         
         elif (method == "circles"):
-            for idx, cat in enumerate(cats, start=1):
-                self.save_image(cat.image, self.make_filename(idx, cat.breed, "original"), path=path)
-                self.save_image(cat.circle_detection(), self.make_filename(idx, cat.breed, f"{method}"), path=path)
+            for cat in cats:
+                self.save_image(cat.image, self.make_filename(cat.index, cat.breed, "original"), path=path)
+                self.save_image(cat.circle_detection(), self.make_filename(cat.index, cat.breed, f"{method}"), path=path)
        
         elif (method == "add"):
-            for idx, cat in enumerate(cats, start=1):
-                self.save_image(cat.image, self.make_filename(idx, cat.breed, "original"), path=path)
+            for cat in cats:
+                self.save_image(cat.image, self.make_filename(cat.index, cat.breed, "original"), path=path)
                 try:
                     other = next(c for c in cats if c is not cat)  # берём следующее изображение
                     #addedimage = cat + other
                     addedimage = cat.adding_with_correction(other)
-                    self.save_image(addedimage, self.make_filename(idx, cat.breed, "add"), path=path)
+                    self.save_image(addedimage, self.make_filename(cat.index, cat.breed, "add"), path=path)
                 except StopIteration:
                     print("Нужно минимум 2 изображения для сложения.")
                 
                 addedimage = cat.adding_with_correction(other)
 
         elif (method == "sub"):
-            for idx, cat in enumerate(cats, start=1):
-                self.save_image(cat.image, self.make_filename(idx, cat.breed, "original"), path=path)
+            for cat in cats:
+                self.save_image(cat.image, self.make_filename(cat.index, cat.breed, "original"), path=path)
                 try:
                     other = next(c for c in cats if c is not cat)
                     subtractedimage = cat - other
-                    self.save_image(subtractedimage, self.make_filename(idx, cat.breed, "sub"), path=path)
+                    self.save_image(subtractedimage, self.make_filename(cat.index, cat.breed, "sub"), path=path)
                 except StopIteration:
                     print("Нужно минимум 2 изображения для вычитания.")
         elif (method == "str"):
-            for idx, cat in enumerate(cats, start=1):
+            for cat in cats:
                 print(str(cat))
 
 
