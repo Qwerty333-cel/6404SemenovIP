@@ -17,6 +17,7 @@
 import cv2
 import time
 import functools
+import asyncio
 
 import interfaces
 
@@ -34,7 +35,19 @@ def log_execution_time(func):
         
         end_time = time.time()
         duration = end_time - start_time
-        print(f"Метод {func.__name__} выполнен за {duration:.4f} секунд.")
+        print(f"Метод {func.__name__} выполнен за {duration:.4f} секунд.\n")
+        return result
+    return wrapper
+
+
+def log_execution_time_async(func):
+    @functools.wraps(func)
+    async def wrapper(self, *args, **kwargs):
+        start_time = time.time()
+        result = await func(self, *args, **kwargs)  # ждём асинхронно!
+        end_time = time.time()
+        duration = end_time - start_time
+        print(f"Метод {func.__name__} выполнен за {duration:.4f} секунд (async). \n")
         return result
     return wrapper
 

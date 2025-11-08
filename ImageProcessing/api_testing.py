@@ -1,15 +1,18 @@
 import os
 import cv2
 import time
+import aiohttp
+import asyncio
+import aiofiles
 import requests
 import numpy as np
 from numpy.typing import NDArray
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Optional, Tuple, List, Sequence
+from typing import Any, Dict, Optional, Tuple, List, Sequence, AsyncGenerator, AsyncIterator
 from requests.exceptions import HTTPError, Timeout, ConnectionError, RequestException
 
 
-from implementation.image_processing import log_execution_time
+from implementation.image_processing import log_execution_time, log_execution_time_async
 from implementation.image_processing import ImageProcessing as img_proc
 
 
@@ -507,8 +510,7 @@ class CatImageProcessor:
                      path: str,     # Часть URL, которая идет после базового адреса
 
                      *,     # Звёздочка означает, что все последующие аргументы должны быть переданы по имени (например, api_key="my_key"), а не по позиции
-                     params: Optional[Dict[str, Any]]=None,         #Optional означает, что можно передать словарь (Dict) или ничего (None).
-                     timeout: Optional[Tuple[float, float]]=None,   #Tuple означает, что это кортеж из двух чисел с плавающей точкой.
+                     params: Optional[Dict[str, Any]]=None         #Optional означает, что можно передать словарь (Dict) или ничего (None).
                     ) -> Dict[str, Any]:
         """
         Функция для выполнения GET-запроса к API и обработки ответов
@@ -546,6 +548,7 @@ class CatImageProcessor:
             # Попытка распарсить JSON
             try:
                 payload = r.json()
+
             except ValueError:
                 payload = {"raw_text": r.text}
         
@@ -559,7 +562,7 @@ class CatImageProcessor:
             return {"ok": False, "error": f"RequestException: {e}", "status": None, "url": url}
 
 
-    # переписать с использованием aiohttp
+
     @log_execution_time
     def loadimage_from_url(self, url: str) -> np.ndarray:
         """
@@ -585,7 +588,118 @@ class CatImageProcessor:
             raise RuntimeError(f"Ошибка при загрузке изображения: {e}")
         
 
-    # распараллелить скачевание изображение и преобразование в объекты класса catImage
+
+    @log_execution_time_async
+    async def async_loadimage_from_url(session, url: str) -> np.ndarray:
+        """
+        Функция для асинхронной загрузки изображения через ссылку
+        
+        Args:
+            seession (aiohttp.ClientSession): Асинхронная сессия для выполнения запросов
+            url (str): Ссылка на изображение
+        Returns:
+            np.ndarray: Изображение в формате cv2
+        """
+
+        try:
+            async with session.get(url) as response:
+                response.raise_for_status()
+                image_buf = await response.read()
+                image_array = np.frombuffer(image_buf, np.uint8)
+                image = cv2.imdecode(image_array, cv2.IMREAD_UNCHANGED)
+
+                if image is None:
+                    raise ValueError("Не удалось декодировать изображение.")
+                return image
+
+        except Exception as e:
+            raise RuntimeError(f"Ошибка при асинхронной загрузке изображения: {e}")
+        
+    @log_execution_time_async
+    async def async_url_gen(self,
+                            limit: int = 1,
+                            has_breeds: int = 1, 
+                            mime_types: str = "jpg,png",
+                            ) -> AsyncGenerator[Tuple[int, str], None]:
+        """
+        Функция для асинхронной загрузки изображения через ссылку
+        
+        Args:
+            seession (aiohttp.ClientSession): Асинхронная сессия для выполнения запросов
+            url (str): Ссылка на изображение
+        Returns:
+            np.ndarray: Изображение в формате cv2
+        """
+        
+        data = self.request_json("/images/search", params = {"limit": limit, "has_breeds": has_breeds,"mime_types": mime_types})
+        if data["ok"]:
+            for i in range(limit):
+                url = data["data"][i].get("url", "")
+                yield i+1, url
+
+        else:
+            raise RuntimeError(f"Ошибка при запросе данных: {data.get('error', 'Unknown error')}")
+
+
+
+    async def download_and_create_cat(self,
+                                      session: aiohttp.ClientSession,
+                                      i: int,
+                                      url: str,
+                                      as_gray: bool = False
+                                      ) -> Optional[Tuple[int, CatImage]]:
+        """
+        Асинхронно скачиваем изображение по ссылке и создаём объект CatImage.
+
+        Args:
+            session (aiohttp.ClientSession): Асинхронная сессия для выполнения запросов
+            i (int): Порядковый номер изображения
+            url (str): Ссылка на изображение
+            as_gray (bool): В каком формате сохранять (чб/цветном)
+
+        Returns:
+            Tuple[int, CatImage]: Пара (порядковый номер, объект CatImage)
+        """
+
+        img = await self.async_loadimage_from_url(session, url)
+        cat = CatImage.from_api_payload(url, img, as_gray=as_gray, idx = i)
+        return i, cat
+
+
+
+    @log_execution_time_async
+    async def async_fetch_cats_gen(self,
+                    as_gray: bool = False,
+                    async_url_gen: AsyncIterator[Tuple[int, str]] = None
+                    ) -> AsyncGenerator[Optional[CatImage], None]:
+        """
+        Асинхронно скачиваем изображение по ссылке и создаём объект CatImage.
+
+        Args:
+            as_gray (bool): В каком формате сохранять (чб/цветном)
+            async_url_gen (AsyncIterator[Tuple[int, str]]): 
+                Асинхронный генератор кортежей (порядковый номер, ссылка на изображение)
+
+        Returns:
+            AsyncGenerator[Optional[CatImage], None]: Асинхронный генератор объектов CatImage
+        """
+
+        cat_tasks = []
+
+        async with aiohttp.ClientSession() as session:
+            async for i, url in async_url_gen:
+                try:
+                    cat_task = asyncio.create_task(self.download_and_create_cat(session, i, url, as_gray=as_gray))
+                    cat_tasks.append(cat_task)
+                except Exception as e:
+                    print(f"Ошибка при обработке данных: {e}")
+                    yield None
+
+            for cat_task in asyncio.as_completed(cat_tasks):
+                cat = await cat_task
+                yield cat
+
+
     @log_execution_time
     # NDArray — это специальный тип для аннотаций, а np.object_ уточняет, что dtype этого массива — object.
     def fetch_cats(self, 
@@ -631,6 +745,15 @@ class CatImageProcessor:
         else:
             raise RuntimeError(f"Ошибка при запросе данных: {data.get('error', 'Unknown error')}")
         
+
+    # async def async_save_image(self,
+    #                            image: np.ndarray, 
+    #                            filename: str, 
+    #                            path: Optional[str] = None
+    #                            ) -> None:
+
+
+
     # переписать с использованием aiofiles
     @log_execution_time
     def save_image(self, 

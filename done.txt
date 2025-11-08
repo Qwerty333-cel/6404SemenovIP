@@ -1,0 +1,12 @@
+1. Переписал индексацию объектов CatImage(и места, где она используется),
+теперь она выполняется при получении изображения(прикреплена к объекту CatImage) и более нигде не может изменяться
+
+2. Написана функция api_testing.CatImageProcessor.async_loadimage_from_url, являющаяся асинхронной
+версией функции api_testing.CatImageProcessor.loadimage_from_url
+
+3. Написана асинхронная версия декоратора для логирования и определения времени выполнения метода
+(image_pricessing.log_execution_time_async)
+
+4. Написан генератор асинхронной загрузки изображений и создания объектов класса CatImage
+(api_testing.CatImageProcessor.async_fetch_cats_gen)
+
