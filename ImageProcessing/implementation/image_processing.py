@@ -40,11 +40,11 @@ def log_execution_time(func):
     return wrapper
 
 
-def log_execution_time_async(func):
+async def log_execution_time_async(func):
     @functools.wraps(func)
     async def wrapper(self, *args, **kwargs):
         start_time = time.time()
-        result = await func(self, *args, **kwargs)  # ждём асинхронно!
+        result = await func(self, *args, **kwargs) 
         end_time = time.time()
         duration = end_time - start_time
         print(f"Метод {func.__name__} выполнен за {duration:.4f} секунд (async). \n")

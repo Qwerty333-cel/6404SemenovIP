@@ -125,6 +125,50 @@ def run_api_flow(method: str, count_str: str | None, outdir: str | None) -> None
         print(f"[API] Ошибка: {e}")
 
 
+async def run_async_flow(method: str, count_str: str | None, outdir: str | None) -> None:
+    """Обработка через API+ASYNC: асинхронно грузим N изображений и сохраняем результаты пачкой."""
+    api_key, base_url = ensure_env_for_api()
+    if not count_str:
+        count_str = 1
+    # Количество изображений
+    if count_str is None:
+        count = 1
+    else:
+        try:
+            count = int(count_str)
+        except ValueError:
+            print("Ошибка: количество изображений должно быть целым числом.")
+            sys.exit(1)
+    if count <= 0:
+        print("Ошибка: количество изображений должно быть > 0.")
+        sys.exit(1)
+
+    # Инициализация процессора
+    
+    processor = CatImageProcessor("saved_images")
+
+    try:
+        print(f"[API+ASYNC] Запрос {count} изображений из TheCatAPI...")
+        urls = processor.async_url_gen(count)
+        cats = processor.async_fetch_cats_gen(urls)
+        with  
+        if cats.size == 0:
+            print("[API+ASYNC] Не удалось получить изображения.")
+            return
+
+        # print(f"[API+ASYNC] Обработка методом '{method}'...")
+        # processor.process_images(
+        #     cats=cats,
+        #     method=method,
+        #     path=outdir,
+        #     kernel=DEFAULT_KERNEL
+        # )
+        print("[API+ASYNC] Готово.")
+
+    except Exception as e:
+        print(f"[API+ASYNC] Ошибка: {e}")
+
+
 def run_local_flow(method: str, input_paths: list[str], out_path: str | None, gamma: float) -> None:
     """Обработка локальных файлов.
     Для add/sub требуется минимум 2 файла, для остальных — 1 файл.
@@ -233,6 +277,8 @@ def main() -> None:
     if args.source == "API":
         count_str = args.inputs[0] if args.inputs else None
         run_api_flow(method=args.method, count_str=count_str, outdir=args.output, gamma=args.gamma, as_gray=args.as_gray)
+    elif args.source == "ASYNC":
+        run_async_flow(method=args.method, count_str=count_str, outdir=args.output, gamma=args.gamma, as_gray=args.as_gray)
     else:
         run_local_flow(method=args.method, input_paths=args.inputs, out_path=args.output, gamma=args.gamma)
 
