@@ -46,13 +46,35 @@ def data_type_converter(data_generator: Iterator[pd.DataFrame]) -> Iterator[pd.D
     Yields:
         pd.DataFrame: DataFrame с приведенными типами данных
     """
+    # conversion_map = {
+    #     YEAR_COL: lambda df: pd.to_numeric(df[YEAR_COL], errors='coerce').astype('Int64'),
+    #     SALES_COL: lambda df: pd.to_numeric(df[SALES_COL], errors='coerce'),
+    #     REVIEW_COL: lambda df: pd.to_numeric(df[REVIEW_COL], errors='coerce')
+    # }
+
+    # for dataframe in data_generator:
+
+    #     updates = {
+    #             col: conversion_map[col](dataframe) for col in applicable_cols
+    #         }
+    #     yield dataframe.assign(**updates)
+
+
+
+
+    cols_to_convert_numeric = [SALES_COL, REVIEW_COL]
+
     for dataframe in data_generator:
+
+        existing_numeric_cols = dataframe.columns.intersection(cols_to_convert_numeric)
+        
+
+        if not existing_numeric_cols.empty:
+            dataframe[existing_numeric_cols] = dataframe[existing_numeric_cols].apply(pd.to_numeric, errors='coerce')
+
         if YEAR_COL in dataframe.columns:
             dataframe[YEAR_COL] = pd.to_numeric(dataframe[YEAR_COL], errors='coerce').astype('Int64')
-        if SALES_COL in dataframe.columns:
-            dataframe[SALES_COL] = pd.to_numeric(dataframe[SALES_COL], errors='coerce')
-        if REVIEW_COL in dataframe.columns:
-            dataframe[REVIEW_COL] = pd.to_numeric(dataframe[REVIEW_COL], errors='coerce')
+            
         yield dataframe
 
 
@@ -336,11 +358,11 @@ def rating_trends_visualization(counts_df: pd.DataFrame, rolling_df: Optional[pd
     plt.close()
 
 
-def correlation_scatter_plot(x_data: pd.Series, y_data: pd.Series, 
-                           output_file: str = 'task4_correlation_scatter.png', 
-                           show_plot: bool = False, correlation: Optional[float] = None) -> None:
+def correlation_scatter_plot(x_data: pd.Series, y_data: pd.Series,
+                             output_file: str = 'task4_correlation_scatter.png',
+                             show_plot: bool = False, correlation: Optional[float] = None) -> None:
     """
-    Создает диаграмму рассеяния для корреляционного анализа.
+    Создает диаграмму рассеяния для корреляционного анализа с линией регрессии.
     
     Args:
         x_data: Данные по оси X
@@ -349,11 +371,26 @@ def correlation_scatter_plot(x_data: pd.Series, y_data: pd.Series,
         show_plot: Показывать ли график
         correlation: Коэффициент корреляции для отображения в заголовке
     """
-    if x_data is None or y_data is None or len(x_data) == 0:
+    if x_data is None or y_data is None or len(x_data) < 2:
         return
     
     plt.figure(figsize=(10, 8))
     plt.scatter(x_data, y_data, s=15, alpha=0.6, color='purple', edgecolors='black', linewidth=0.5)
+    
+
+    slope, intercept = np.polyfit(x_data, y_data, 1)
+
+
+    line_x = np.array([x_data.min(), x_data.max()])
+    
+
+    line_y = slope * line_x + intercept
+
+
+    plt.plot(line_x, line_y, color='red', linewidth=2, label='Линия тренда')
+
+
+
     plt.xlabel('Оценка игры', fontsize=12)
     plt.ylabel('Продажи (млн. долларов)', fontsize=12)
     
@@ -363,6 +400,7 @@ def correlation_scatter_plot(x_data: pd.Series, y_data: pd.Series,
     
     plt.title(title_text, fontsize=16, pad=20)
     plt.grid(True, alpha=0.3)
+    plt.legend() # Добавляем легенду, чтобы отобразить метку 'Линия тренда'
     plt.tight_layout()
     plt.savefig(output_file, dpi=300, bbox_inches='tight')
     if show_plot:
