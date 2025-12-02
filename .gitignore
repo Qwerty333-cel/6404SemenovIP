@@ -8,3 +8,4 @@ venv/
 *.ipynb
 saved_images/
 *.csv
+*.parquet
