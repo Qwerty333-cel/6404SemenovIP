@@ -11,3 +11,5 @@ saved_images/
 *.parquet
 lab5
 lab3
+.env
+*.csv
