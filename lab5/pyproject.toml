@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cat-app"
+version = "0.1.0"
+description = "Лаба с обработкой изображений котов"
+requires-python = ">=3.10"
+dependencies = [
+    "python-dotenv",
+    "aiohttp",
+    "aiofiles",
+    "numpy",
+    "Pillow",
+    "requests",
+    "opencv-python"
+]
+
+[tool.setuptools.packages.find]
+include = ["cat_app"]

@@ -1,9 +1,0 @@
-.venv/
-results/
-__pycache__/
-venv/
-*.pyc
-*.rar
-*.ipynb
-.env
-*.csv

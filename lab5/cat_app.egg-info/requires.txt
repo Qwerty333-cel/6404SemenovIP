@@ -1,0 +1,7 @@
+python-dotenv
+aiohttp
+aiofiles
+numpy
+Pillow
+requests
+opencv-python

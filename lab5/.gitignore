@@ -1,0 +1,16 @@
+.venv/
+newvenv/
+nvenv/
+**/results/
+**/__pycache__/
+venv/
+.env
+*.pyc
+*.rar
+*.ipynb
+saved_images/
+**/test_images/
+*.log
+Pipfile
+.flake8
+Pipfile.lock
