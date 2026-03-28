@@ -7,3 +7,6 @@ venv/
 *.ipynb
 .env
 *.csv
+*.png
+*.parquet
+lab5
