@@ -2,8 +2,14 @@
 results/
 __pycache__/
 venv/
+.env
 *.pyc
 *.rar
 *.ipynb
+saved_images/
+*.csv
+*.parquet
+lab5
+lab3
 .env
 *.csv
