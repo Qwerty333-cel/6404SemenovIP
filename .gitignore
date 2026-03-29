@@ -6,4 +6,7 @@ venv/
 *.rar
 *.ipynb
 .env
+lab3
+lab5
 *.csv
+
